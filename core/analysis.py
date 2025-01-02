@@ -50,32 +50,59 @@ class Analysis:
         keys = self.data["key"].tolist()
         return getattr(self, ocr_type + "_analysis")()
 
-    def merge_raw_data(self, fileds):
+    def merge_raw_data(self, fileds: dict):
         """
         合并原始数据
         :return:
         """
-        # fileds = ["数量", "合计"]
-        for filed in fileds:
-            if ":" in filed:
-                filed = filed.split(":")[0]
-            start_text, end_text = filed[0], filed[-1]
-            filtered_df = self.data[
-                (self.data['key'].str.startswith(start_text) | self.data['key'].str.endswith(end_text)) &
-                (self.data['y_offset_up'] >= self.data['index_2']) &
-                (self.data['index_2'] >= self.data['y_offset_low'])
-                ]
+
+        def merge(filtered_df):
             filtered_df = filtered_df.sort_values(by=['index_2'], ascending=[True])
             if filtered_df.shape[0] >= 2:
                 indexes_list = filtered_df.index.tolist()
                 # 合并操作
-                new_key = "".join(filtered_df["key"].tolist())
+                first_key = filtered_df["key"].iloc[0].split(":", "")
+                remaining_keys = filtered_df["key"].iloc[1:]
+                new_key = first_key + ":" + " ".join(remaining_keys.tolist())
                 self.data.loc[indexes_list[0], 'key'] = new_key
                 self.data.loc[indexes_list[0], 'index_3'] = filtered_df.loc[indexes_list[-1], 'index_3']
                 self.data.loc[indexes_list[0], 'index_2'] = filtered_df.loc[indexes_list[-1], 'index_2']
                 self.data.loc[indexes_list[0], 'index_7'] = filtered_df.loc[indexes_list[-1], 'index_7']
 
                 self.data.drop(indexes_list[1:])
+
+        for filed in fileds.keys():
+            extension_multiplier_x = fileds.get(filed)
+            if not extension_multiplier_x:
+                if ":" in filed:
+                    filed = filed.split(":")[0]
+                start_text, end_text = filed[0], filed[-1]
+                filtered_df = self.data[
+                    (self.data['key'].str.startswith(start_text) | self.data['key'].str.endswith(end_text)) &
+                    (self.data['y_offset_up'] >= self.data['index_2']) &
+                    (self.data['index_2'] >= self.data['y_offset_low'])
+                    ]
+                merge(filtered_df)
+            else:
+                curr_df = self.data[self.data['key'].str.startswith(filed)]
+                if curr_df.empty:
+                    continue
+                # x偏移设置
+                shape = curr_df.shape[0]
+                for i in range(shape):
+                    curr_index_3 = curr_df.iloc[i]['index_3']
+                    curr_filed_length = curr_df.iloc[i]['filed_length'] * extension_multiplier_x
+                    curr_y_offset_up = curr_df.iloc[i]['y_offset_up']
+                    y_offset_low = curr_df.iloc[i]['y_offset_low']
+
+                    merge_x_offset = curr_index_3 + curr_filed_length
+                    filtered_df = self.data[
+                        (self.data['index_3'] >= curr_index_3) &
+                        (merge_x_offset >= self.data['index_7']) &
+                        (curr_y_offset_up >= self.data['index_2']) &
+                        (self.data['index_2'] >= y_offset_low)
+                        ]
+                    merge(filtered_df)
 
     def ordinary_invoice_analysis(self):
         # 需要合并的字段

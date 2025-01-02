@@ -79,7 +79,7 @@ class Analysis:
 
     def ordinary_invoice_analysis(self):
         # 需要合并的字段
-        fileds = ["数量", "合计"]
+        fileds = {"数量": None, "合计": None}
         self.merge_raw_data(fileds)
 
         购买方名称 = self.analysis_index(key="名称:", direction="like", block=1)
@@ -107,24 +107,11 @@ class Analysis:
 
     def vat_invoice_analysis(self):
         # 需要合并的字段
-        fileds = ["数量", "合计"]
+        fileds = {"纳税人识别号:": 0.2}
         self.merge_raw_data(fileds)
-        价税合计 = self.analysis_index(key="价税合计(大写)", direction="right", end_key="小写")
-        项目名称 = self.analysis_index(key="项目名称", direction="below")
-        规格型号 = self.analysis_index(key="规格型号", direction="below")
-        单位 = self.analysis_index(key="单位", direction="below")
-        数量 = self.analysis_index(key="数量", direction="below")
-        金额 = self.analysis_index(key="金额", direction="below")
-        税额 = self.analysis_index(key="税额", direction="below")
-        购买方名称 = self.analysis_index(key="名称:", direction="like", block=1)
-        if 购买方名称:
-            购买方名称 = 购买方名称[0].split(":")[1]
-        销售方名称 = self.analysis_index(key="名称:", direction="like", block=2)
-        if 销售方名称:
-            销售方名称 = 销售方名称[0].split(":")[1]
-
-        data = {"价税合计": 价税合计, "项目名称": 项目名称, "规格型号": 规格型号, "单位": 单位, "数量": 数量,
-                "金额": 金额, "税额": 税额, "购买方名称": 购买方名称, "销售方名称": 销售方名称}
+        购买方纳税人识别号 = self.analysis_index(key="纳税人识别号:", direction="like", block=1)
+        销售方方纳税人识别号 = self.analysis_index(key="纳税人识别号:", direction="like", block=3)
+        data = {"购买方纳税人识别号": 购买方纳税人识别号, "销售方方纳税人识别号": 销售方方纳税人识别号}
         print(data)
         return data
 
@@ -151,7 +138,6 @@ class Analysis:
             expr = 'key.str.contains(@key, case=False, na=False)'
             expr += append_block_filter
             curr_key = self.data.query(expr, engine='python')
-            # print(curr_key["key"].tolist())
             return curr_key["key"].tolist()
         if end_key is not None:
             end_in_words = self.data.query('key.str.contains(@end_key, case=False, na=False)', engine='python')
@@ -159,26 +145,26 @@ class Analysis:
         if not start_in_words.empty:
             first_row = start_in_words.iloc[0]
             if end_key is not None and direction == "right":
-                query_str = f'{first_row["y_offset_low"]} < index_2 < {first_row["y_offset_up"]} and index_1 != {first_row["index_1"]} and index_8 <= {end_row["index_8"]}'
+                query_str = f'{first_row["y_offset_low"]} < index_2 < {first_row["y_offset_up"]} and index_1 != {first_row["index_1"]} and index_7 <= {end_row["index_7"]}'
                 query_str += append_block_filter
                 filter_values_words_value = self.data.query(query_str)
 
             elif end_key is None and direction == "right":
-                query_str = f'{first_row["y_offset_low"]} < index_2 < {first_row["y_offset_up"]} and index_1 != {first_row["index_1"]} and {first_row["index_3"]}<= index_8 <= {first_row["index_3"] + first_row["filed_length"]}'
+                query_str = f'{first_row["y_offset_low"]} < index_2 < {first_row["y_offset_up"]} and index_1 != {first_row["index_1"]} and {first_row["index_3"]}<= index_7 <= {first_row["index_3"] + first_row["filed_length"]}'
                 query_str += append_block_filter
                 filter_values_words_value = self.data.query(query_str)
 
             elif end_key is None and direction == "below":
                 # 左对齐 或右对齐
                 filed_height = first_row["filed_height"]
-                query_str = f' ({first_row["x_offset_low"]} < index_3 < {first_row["x_offset_up"]} and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height} and index_2 != {first_row["index_2"]}) or ({first_row["x_offset_low"]} < index_7 < {first_row["x_offset_up"]} and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height} and index_2 != {first_row["index_2"]})'
+                query_str = f' ({first_row["x_offset_low"]} < index_3 < {first_row["x_offset_up"]} and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height * 2} and index_2 != {first_row["index_2"]}) or ({first_row["x_offset_low"]} < index_7 < {first_row["x_offset_up"]} and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height * 2} and index_2 != {first_row["index_2"]})'
                 query_str += append_block_filter
                 filter_values_words_value = self.data.query(query_str)
 
             elif end_key is not None and direction == "below":
                 # 左对齐 或右对齐
                 filed_height = end_row["filed_height"]
-                query_str = f' ({first_row["x_offset_low"]} < index_3 < {first_row["x_offset_up"]} and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height} and index_2 != {first_row["index_2"]}) or ({first_row["x_offset_low"]} < index_7 < {first_row["x_offset_up"]} and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height} and index_2 != {first_row["index_2"]})'
+                query_str = f' ({first_row["x_offset_low"]} < index_3 < {first_row["x_offset_up"]} and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height * 2} and index_2 != {first_row["index_2"]}) or ({first_row["x_offset_low"]} < index_7 < {first_row["x_offset_up"]} and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height * 2} and index_2 != {first_row["index_2"]})'
                 query_str += append_block_filter
                 filter_values_words_value = self.data.query(query_str)
             return filter_values_words_value["key"].tolist()

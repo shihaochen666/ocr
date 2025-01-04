@@ -1,5 +1,8 @@
+import time
+
 import pandas as pd
 from paddleocr import PaddleOCR
+from pandas import merge_asof
 
 
 class Analysis:
@@ -22,14 +25,16 @@ class Analysis:
             det_db_box_thresh=0.6,
             det_db_thresh=0.4,
         )
-        result = ocr.ocr(img_stream,cls=True)
+        result = ocr.ocr(img_stream, cls=True)
         for idx in range(len(result)):
             res = result[idx]
         for line in res:
             index = line[0]
             row = {"index_1": index[0][0], "index_2": index[0][1], "index_3": index[1][0], "index_4": index[1][1],
                    "index_5": index[2][0], "index_6": index[2][1], "index_7": index[3][0], "index_8": index[3][1],
-                   "key": line[1][0].replace("：", ":").replace("_", "").replace("（", "(").replace("）", ")"), "accuracy": line[1][1]}
+                   "key": line[1][0].replace("：", ":").replace("_", "").replace("（", "(").replace("）", ")").replace(" ",
+                                                                                                                    ""),
+                   "accuracy": line[1][1]}
             data.append(row)
         data = pd.DataFrame(data)
         data = data.sort_values(by=['index_1', 'index_2'], ascending=[True, True])
@@ -40,36 +45,33 @@ class Analysis:
         data["x_offset_up"] = data["index_3"] * 1.01
         data["x_offset_low"] = data["index_7"] * 0.99
         data["filed_length"] = data["index_3"] - data["index_7"]
-        data["filed_height"] = data["index_6"] - data["index_4"]
+        data["filed_height"] = (data["index_6"] - data["index_4"])
         self.middle_y = (max(data["index_2"]) - min(data["index_2"])) / 2
         self.middle_x = (max(data["index_3"]) - min(data["index_3"])) / 2
         print(data)
         self.data = data
 
-    def data_handle(self,ocr_type:str):
+    def data_handle(self, ocr_type: str):
         keys = self.data["key"].tolist()
         return getattr(self, ocr_type + "_analysis")()
 
-    def merge_raw_data(self, fileds):
+    def merge_raw_data(self, fileds: dict):
         """
         合并原始数据
         :return:
         """
-        # fileds = ["数量", "合计"]
-        for filed in fileds:
-            if ":" in filed:
-                filed = filed.split(":")[0]
-            start_text, end_text = filed[0], filed[-1]
-            filtered_df = self.data[
-                (self.data['key'].str.startswith(start_text) | self.data['key'].str.endswith(end_text)) &
-                (self.data['y_offset_up'] >= self.data['index_2']) &
-                (self.data['index_2'] >= self.data['y_offset_low'])
-                ]
+
+        def merge(filtered_df, join_flag=True):
             filtered_df = filtered_df.sort_values(by=['index_2'], ascending=[True])
             if filtered_df.shape[0] >= 2:
                 indexes_list = filtered_df.index.tolist()
                 # 合并操作
-                new_key = "".join(filtered_df["key"].tolist())
+                first_key = str(filtered_df["key"].iloc[0]).replace(":", "")
+                remaining_keys = filtered_df["key"].iloc[1:]
+                if join_flag:
+                    new_key = first_key + ":" + "".join(remaining_keys.tolist())
+                else:
+                    new_key = "".join(filtered_df["key"].tolist())
                 self.data.loc[indexes_list[0], 'key'] = new_key
                 self.data.loc[indexes_list[0], 'index_3'] = filtered_df.loc[indexes_list[-1], 'index_3']
                 self.data.loc[indexes_list[0], 'index_2'] = filtered_df.loc[indexes_list[-1], 'index_2']
@@ -77,17 +79,54 @@ class Analysis:
 
                 self.data.drop(indexes_list[1:])
 
+        for filed in fileds.keys():
+            extension_multiplier_x = fileds.get(filed)
+            if not extension_multiplier_x:
+                if ":" in filed:
+                    filed = filed.split(":")[0]
+                start_text, end_text = filed[0], filed[-1]
+                filtered_df = self.data[
+                    (self.data['key'].str.startswith(start_text) | self.data['key'].str.endswith(end_text)) &
+                    (self.data['y_offset_up'] >= self.data['index_2']) &
+                    (self.data['index_2'] >= self.data['y_offset_low'])
+                    ]
+                merge(filtered_df, False)
+            else:
+                curr_df = self.data[self.data['key'].str.startswith(filed)]
+                if curr_df.empty:
+                    continue
+                # x偏移设置
+                shape = curr_df.shape[0]
+                for i in range(shape):
+                    curr_index_3 = curr_df.iloc[i]['index_3']
+                    curr_filed_length = curr_df.iloc[i]['filed_length'] * extension_multiplier_x
+                    curr_y_offset_up = curr_df.iloc[i]['y_offset_up']
+                    y_offset_low = curr_df.iloc[i]['y_offset_low']
+
+                    merge_x_offset = curr_index_3 + curr_filed_length
+                    filtered_df = self.data[
+                        (self.data['index_3'] >= curr_index_3) &
+                        (merge_x_offset >= self.data['index_7']) &
+                        (curr_y_offset_up >= self.data['index_2']) &
+                        (self.data['index_2'] >= y_offset_low)
+                        ]
+                    merge(filtered_df)
+
     def ordinary_invoice_analysis(self):
         # 需要合并的字段
-        fileds = ["数量", "合计"]
+        fileds = {"数量": None, "合计": None}
         self.merge_raw_data(fileds)
 
-        购买方名称 = self.analysis_index(key="名称:", direction="like", block=1)
-        if 购买方名称:
-            购买方名称 = 购买方名称[0].split(":")[1]
-        销售方名称 = self.analysis_index(key="名称:", direction="like", block=2)
-        if 销售方名称:
-            销售方名称 = 销售方名称[0].split(":")[1]
+        名称 = self.analysis_index(key="名称:", direction="like")
+        if 名称 and len(名称) > 0:
+            购买方名称 = 名称[0].split(":")[1]
+        else:
+            购买方名称 = "未知购买方名称"  # 或记录日志
+
+        if 名称 and len(名称) > 1:
+            销售方名称 = 名称[1].split(":")[1]
+        else:
+            销售方名称 = "未知销售方名称"  # 或记录日志
         价税合计 = self.analysis_index(key="价税合计(大写)", direction="right", end_key="小写")
         项目名称 = self.analysis_index(key="项目名称", direction="below")
         规格型号 = self.analysis_index(key="规格型号", direction="below")
@@ -95,36 +134,33 @@ class Analysis:
         数量 = self.analysis_index(key="数量", direction="below")
         金额 = self.analysis_index(key="金额", direction="below")
         税额 = self.analysis_index(key="税额", direction="below")
-        开票日期=self.analysis_index(key="开票日期:", direction="like")
-        发票号码=self.analysis_index(key="发票号码:", direction="like")
-        开票人=self.analysis_index(key="开票人:", direction="like")
+        开票日期 = self.analysis_index(key="开票日期:", direction="like")
+        发票号码 = self.analysis_index(key="发票号码:", direction="like")
+        开票人 = self.analysis_index(key="开票人:", direction="like")
 
-        data = {"开票日期":开票日期,"发票号码":发票号码,"购买方名称": 购买方名称, "销售方名称": 销售方名称,"价税合计": 价税合计, "项目名称": 项目名称,
-             "规格型号": 规格型号, "单位": 单位, "数量": 数量,"金额": 金额, "税额": 税额,"开票人":开票人 }
+        data = {"开票日期": 开票日期, "发票号码": 发票号码, "购买方名称": 购买方名称, "销售方名称": 销售方名称,
+                "价税合计": 价税合计, "项目名称": 项目名称,
+                "规格型号": 规格型号, "单位": 单位, "数量": 数量, "金额": 金额, "税额": 税额, "开票人": 开票人}
         print(data)
         return data
 
-
     def vat_invoice_analysis(self):
         # 需要合并的字段
-        fileds = ["数量", "合计"]
-        self.merge_raw_data(fileds)
-        价税合计 = self.analysis_index(key="价税合计(大写)", direction="right", end_key="小写")
-        项目名称 = self.analysis_index(key="项目名称", direction="below")
-        规格型号 = self.analysis_index(key="规格型号", direction="below")
-        单位 = self.analysis_index(key="单位", direction="below")
-        数量 = self.analysis_index(key="数量", direction="below")
-        金额 = self.analysis_index(key="金额", direction="below")
-        税额 = self.analysis_index(key="税额", direction="below")
-        购买方名称 = self.analysis_index(key="名称:", direction="like", block=1)
-        if 购买方名称:
-            购买方名称 = 购买方名称[0].split(":")[1]
-        销售方名称 = self.analysis_index(key="名称:", direction="like", block=2)
-        if 销售方名称:
-            销售方名称 = 销售方名称[0].split(":")[1]
+        fileds = {"收款人:": 0.3, "纳税人识别号:": 0.2}
 
-        data = {"价税合计": 价税合计, "项目名称": 项目名称, "规格型号": 规格型号, "单位": 单位, "数量": 数量,
-                "金额": 金额, "税额": 税额, "购买方名称": 购买方名称, "销售方名称": 销售方名称}
+        self.merge_raw_data(fileds)
+        购买方纳税人识别号 = self.analysis_index(key="纳税人识别号:", direction="like", block=1)[0].split(":")[1]
+        销售方方纳税人识别号 = self.analysis_index(key="纳税人识别号:", direction="like", block=3)[0].split(":")[1]
+        税率 = self.analysis_index(key="税率", direction="below")
+        购买方开户行及账号 = self.analysis_index(key="开户行及账号", direction="like", block=3)
+        销售方方开户行及账号 = self.analysis_index(key="开户行及账号", direction="like", block=1)
+
+        收款人 = self.analysis_index(key="收款人:", direction="like", block=1)
+
+        print(self.data)
+        data = {"购买方纳税人识别号": 购买方纳税人识别号, "销售方方纳税人识别号": 销售方方纳税人识别号, "税率": 税率,
+                "购买方开户行及账号": 购买方开户行及账号, "销售方收款人": 收款人,
+                "销售方方开户行及账号": 销售方方开户行及账号}
         print(data)
         return data
 
@@ -151,7 +187,6 @@ class Analysis:
             expr = 'key.str.contains(@key, case=False, na=False)'
             expr += append_block_filter
             curr_key = self.data.query(expr, engine='python')
-            # print(curr_key["key"].tolist())
             return curr_key["key"].tolist()
         if end_key is not None:
             end_in_words = self.data.query('key.str.contains(@end_key, case=False, na=False)', engine='python')
@@ -159,26 +194,26 @@ class Analysis:
         if not start_in_words.empty:
             first_row = start_in_words.iloc[0]
             if end_key is not None and direction == "right":
-                query_str = f'{first_row["y_offset_low"]} < index_2 < {first_row["y_offset_up"]} and index_1 != {first_row["index_1"]} and index_8 <= {end_row["index_8"]}'
+                query_str = f'{first_row["y_offset_low"]} < index_2 < {first_row["y_offset_up"]} and index_1 != {first_row["index_1"]} and index_7 <= {end_row["index_7"]}'
                 query_str += append_block_filter
                 filter_values_words_value = self.data.query(query_str)
 
             elif end_key is None and direction == "right":
-                query_str = f'{first_row["y_offset_low"]} < index_2 < {first_row["y_offset_up"]} and index_1 != {first_row["index_1"]} and {first_row["index_3"]}<= index_8 <= {first_row["index_3"] + first_row["filed_length"]}'
+                query_str = f'{first_row["y_offset_low"]} < index_2 < {first_row["y_offset_up"]} and index_1 != {first_row["index_1"]} and {first_row["index_3"]}<= index_7 <= {first_row["index_3"] + first_row["filed_length"]}'
                 query_str += append_block_filter
                 filter_values_words_value = self.data.query(query_str)
 
             elif end_key is None and direction == "below":
                 # 左对齐 或右对齐
                 filed_height = first_row["filed_height"]
-                query_str = f' ({first_row["x_offset_low"]} < index_3 < {first_row["x_offset_up"]} and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height} and index_2 != {first_row["index_2"]}) or ({first_row["x_offset_low"]} < index_7 < {first_row["x_offset_up"]} and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height} and index_2 != {first_row["index_2"]})'
+                query_str = f' ({first_row["x_offset_low"]} < index_3 < {first_row["x_offset_up"]} and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height * 2} and index_2 != {first_row["index_2"]}) or ({first_row["x_offset_low"]} < index_7 < {first_row["x_offset_up"]} and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height * 2} and index_2 != {first_row["index_2"]})'
                 query_str += append_block_filter
                 filter_values_words_value = self.data.query(query_str)
 
             elif end_key is not None and direction == "below":
                 # 左对齐 或右对齐
                 filed_height = end_row["filed_height"]
-                query_str = f' ({first_row["x_offset_low"]} < index_3 < {first_row["x_offset_up"]} and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height} and index_2 != {first_row["index_2"]}) or ({first_row["x_offset_low"]} < index_7 < {first_row["x_offset_up"]} and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height} and index_2 != {first_row["index_2"]})'
+                query_str = f' ({first_row["x_offset_low"]} < index_3 < {first_row["x_offset_up"]} and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height * 2} and index_2 != {first_row["index_2"]}) or ({first_row["x_offset_low"]} < index_7 < {first_row["x_offset_up"]} and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height * 2} and index_2 != {first_row["index_2"]})'
                 query_str += append_block_filter
                 filter_values_words_value = self.data.query(query_str)
             return filter_values_words_value["key"].tolist()
@@ -187,8 +222,8 @@ class Analysis:
 
 
 if __name__ == '__main__':
-    ao = Analysis("../imgs/1.jpg")
-    ao.data_handle()
+    ao = Analysis("../uploadfile/4.PNG")
+    ao.data_handle("vat_invoice")
     # ao.analysis_index(key="价税合计(大写)", direction="right", end_key="小写")
     # ao.analysis_index(key="项目名称", direction="below")
     # ao.analysis_index(key="规格型号", direction="below")
@@ -198,3 +233,15 @@ if __name__ == '__main__':
     # ao.analysis_index(key="税额", direction="below")
     # ao.analysis_index(key="名称:", direction="like", block=1)
     # ao.analysis_index(key="名称:", direction="like", block=2)
+    # index_1  index_2  index_3  index_4  index_5  index_6  index_7  index_8  \
+# 26    472.0    143.0    499.0    143.0    499.0    154.0    472.0    154.0    税率
+# 33    483.0    156.0    500.0    156.0    500.0    169.0    483.0    169.0    3%
+# 60    147.0   1105.0   1054.0   1110.0   1054.0   1146.0    147.0   1142.0
+
+
+# query_str = f' ({first_row["x_offset_low"]} < index_3 < {first_row["x_offset_up"]}
+# and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height}
+# and index_2 != {first_row["index_2"]}) or
+# ({first_row["x_offset_low"]} < index_7 < {first_row["x_offset_up"]}
+# and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height}
+# and index_2 != {first_row["index_2"]})'

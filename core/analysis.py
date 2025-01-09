@@ -22,10 +22,11 @@ class Analysis:
             use_space_char=True,
             layout=True,  # 启用布局分析
             table=True,  # 启用表格识别
-            det_db_box_thresh=0.6,
-            det_db_thresh=0.4,
+            det_db_box_thresh=0.1,
+            det_db_thresh=0.1,
         )
         result = ocr.ocr(img_stream, cls=True)
+        print(result)
         for idx in range(len(result)):
             res = result[idx]
         for line in res:
@@ -55,6 +56,8 @@ class Analysis:
         keys = self.data["key"].tolist()
         return getattr(self, ocr_type + "_analysis")()
 
+
+     
     def merge_raw_data(self, fileds: dict):
         """
         合并原始数据
@@ -112,11 +115,31 @@ class Analysis:
                         ]
                     merge(filtered_df)
 
+    def vat_invoice_analysis(self):
+            # 需要合并的字段
+            fileds = {"收款人:": 0.3, "纳税人识别号:": 0.2}
+
+            self.merge_raw_data(fileds)
+            购买方纳税人识别号 = self.analysis_index(key="纳税人识别号:", direction="like", block=1)[0].split(":")[1]
+            销售方方纳税人识别号 = self.analysis_index(key="纳税人识别号:", direction="like", block=3)[0].split(":")[1]
+            税率 = self.analysis_index(key="税率", direction="below")
+            购买方开户行及账号 = self.analysis_index(key="开户行及账号", direction="like", block=3)
+            销售方方开户行及账号 = self.analysis_index(key="开户行及账号", direction="like", block=1)
+
+            收款人 = self.analysis_index(key="收款人:", direction="like", block=1)
+
+            print(self.data)
+            data = {"购买方纳税人识别号": 购买方纳税人识别号, "销售方方纳税人识别号": 销售方方纳税人识别号, "税率": 税率,
+                    "购买方开户行及账号": 购买方开户行及账号, "销售方收款人": 收款人,
+                    "销售方方开户行及账号": 销售方方开户行及账号}
+            print(data)
+            return data
+
     def ordinary_invoice_analysis(self):
+
         # 需要合并的字段
         fileds = {"数量": None, "合计": None}
         self.merge_raw_data(fileds)
-
         名称 = self.analysis_index(key="名称:", direction="like")
         if 名称 and len(名称) > 0:
             购买方名称 = 名称[0].split(":")[1]
@@ -127,7 +150,11 @@ class Analysis:
             销售方名称 = 名称[1].split(":")[1]
         else:
             销售方名称 = "未知销售方名称"  # 或记录日志
-        价税合计 = self.analysis_index(key="价税合计(大写)", direction="right", end_key="小写")
+        价税合计 = self.analysis_index(key=r'([壹贰叁肆伍陆柒捌玖拾佰仟零]+(?:零)?)*[圆元](?:[零壹贰叁肆伍陆柒捌玖拾]+角)?(?:[零壹贰叁肆伍陆捌玖拾]+分)?(?:整)?', direction="like")
+        价税合计大写 = "未知"
+        if 价税合计 :
+            价税合计大写=价税合计[0]
+        价税合计小写 = self.analysis_index(key="(小写)", direction="like")
         项目名称 = self.analysis_index(key="项目名称", direction="below")
         规格型号 = self.analysis_index(key="规格型号", direction="below")
         单位 = self.analysis_index(key="单位", direction="below")
@@ -139,30 +166,12 @@ class Analysis:
         开票人 = self.analysis_index(key="开票人:", direction="like")
 
         data = {"开票日期": 开票日期, "发票号码": 发票号码, "购买方名称": 购买方名称, "销售方名称": 销售方名称,
-                "价税合计": 价税合计, "项目名称": 项目名称,
+                "价税合计大写": 价税合计大写,"价税合计小写": 价税合计小写, "项目名称": 项目名称,
                 "规格型号": 规格型号, "单位": 单位, "数量": 数量, "金额": 金额, "税额": 税额, "开票人": 开票人}
         print(data)
         return data
 
-    def vat_invoice_analysis(self):
-        # 需要合并的字段
-        fileds = {"收款人:": 0.3, "纳税人识别号:": 0.2}
-
-        self.merge_raw_data(fileds)
-        购买方纳税人识别号 = self.analysis_index(key="纳税人识别号:", direction="like", block=1)[0].split(":")[1]
-        销售方方纳税人识别号 = self.analysis_index(key="纳税人识别号:", direction="like", block=3)[0].split(":")[1]
-        税率 = self.analysis_index(key="税率", direction="below")
-        购买方开户行及账号 = self.analysis_index(key="开户行及账号", direction="like", block=3)
-        销售方方开户行及账号 = self.analysis_index(key="开户行及账号", direction="like", block=1)
-
-        收款人 = self.analysis_index(key="收款人:", direction="like", block=1)
-
-        print(self.data)
-        data = {"购买方纳税人识别号": 购买方纳税人识别号, "销售方方纳税人识别号": 销售方方纳税人识别号, "税率": 税率,
-                "购买方开户行及账号": 购买方开户行及账号, "销售方收款人": 收款人,
-                "销售方方开户行及账号": 销售方方开户行及账号}
-        print(data)
-        return data
+   
 
     def analysis_index(self, key, direction, end_key=None, block=-1):
 
@@ -193,7 +202,9 @@ class Analysis:
             end_row = end_in_words.iloc[0]
         if not start_in_words.empty:
             first_row = start_in_words.iloc[0]
+
             if end_key is not None and direction == "right":
+
                 query_str = f'{first_row["y_offset_low"]} < index_2 < {first_row["y_offset_up"]} and index_1 != {first_row["index_1"]} and index_7 <= {end_row["index_7"]}'
                 query_str += append_block_filter
                 filter_values_words_value = self.data.query(query_str)
@@ -222,9 +233,9 @@ class Analysis:
 
 
 if __name__ == '__main__':
-    ao = Analysis("../uploadfile/4.PNG")
-    ao.data_handle("vat_invoice")
-    # ao.analysis_index(key="价税合计(大写)", direction="right", end_key="小写")
+    ao = Analysis("../imgs/电子发票/IMG_20241231_141457.jpg")
+    #ao.data_handle("ordinary_invoice")
+    ao.analysis_index(key="价税合计(大写)", direction="right", end_key="小写")
     # ao.analysis_index(key="项目名称", direction="below")
     # ao.analysis_index(key="规格型号", direction="below")
     # ao.analysis_index(key="单位", direction="below")

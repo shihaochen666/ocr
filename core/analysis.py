@@ -1,5 +1,5 @@
 import time
-
+import re
 import pandas as pd
 from paddleocr import PaddleOCR
 from pandas import merge_asof
@@ -7,7 +7,7 @@ from pandas import merge_asof
 
 class Analysis:
 
-    def __init__(self, img_stream):
+    def __init__(self,ocr_type, img_stream):
 
         pd.set_option('display.max_colwidth', None)
         pd.set_option('display.max_rows', None)
@@ -17,7 +17,7 @@ class Analysis:
         ocr = PaddleOCR(
             use_angle_cls=True,  # 启用方向分类器
             lang='ch',  # 使用简体中文模型
-            det_algorithm='DB',  # 文本检测算法选择DB
+            det_algorithm='DB',  # 文本检测算法选择DB   
             rec_algorithm='CRNN',  # 文本识别算法选择SVTR_LCNet
             use_space_char=True,
             layout=True,  # 启用布局分析
@@ -39,17 +39,31 @@ class Analysis:
             data.append(row)
         data = pd.DataFrame(data)
         data = data.sort_values(by=['index_1', 'index_2'], ascending=[True, True])
-        # 行高容错设置
-        data["row_height"] = abs(data["index_4"] - data["index_6"]) / 2.5
-        data["filed_height"] = data["index_6"] - data["index_4"]
-        data["filed_length"] = data["index_3"] - data["index_7"]
+        if ocr_type == 'vat_invoice':
+              # 行高容错设置
+            data["row_height"] = abs(data["index_4"] - data["index_6"]) / 2
+            data["filed_height"] = data["index_6"] - data["index_4"]
+            data["filed_length"] = data["index_3"] - data["index_7"]
 
-        data["y_offset_up"] = data["index_2"] + data["filed_height"] * 0.5
-        data["y_offset_low"] = data["index_2"] - data["filed_height"] * 0.5
-        data["x_offset_up"] = data["index_3"] + data["filed_height"] * 0.5
-        data["x_offset_low"] = data["index_7"] - data["filed_height"] * 0.5
-        self.middle_y = (max(data["index_2"]) - min(data["index_2"])) / 2
-        self.middle_x = (max(data["index_3"]) - min(data["index_3"])) / 2
+            data["y_offset_up"] = data["index_2"] + data["filed_height"] * 3
+            data["y_offset_low"] = data["index_2"] - data["filed_height"] * 3
+            data["x_offset_up"] = data["index_3"] + data["filed_height"] * 3
+            data["x_offset_low"] = data["index_7"] - data["filed_height"] * 3
+            self.middle_y = (max(data["index_2"]) - min(data["index_2"])) / 2
+            self.middle_x = (max(data["index_3"]) - min(data["index_3"])) / 2
+        else:
+            # 行高容错设置
+            data["row_height"] = abs(data["index_4"] - data["index_6"]) / 2.5
+            data["filed_height"] = data["index_6"] - data["index_4"]
+            data["filed_length"] = data["index_3"] - data["index_7"]
+
+            data["y_offset_up"] = data["index_2"] + data["filed_height"] * 3
+            data["y_offset_low"] = data["index_2"] - data["filed_height"] * 3
+            data["x_offset_up"] = data["index_3"] + data["filed_height"] * 3
+            data["x_offset_low"] = data["index_7"] - data["filed_height"] * 3
+            self.middle_y = (max(data["index_2"]) - min(data["index_2"])) / 2
+            self.middle_x = (max(data["index_3"]) - min(data["index_3"])) / 2
+
         print(data)
         self.data = data
 
@@ -117,7 +131,7 @@ class Analysis:
 
     def vat_invoice_analysis(self):
             # 需要合并的字段
-            fileds = {"收款人:": 0.3, "纳税人识别号:": 0.2}
+            fileds = {"收款人:": 0.3}
 
             self.merge_raw_data(fileds)
             名称 = self.analysis_index(key="名称:", direction="like")
@@ -155,12 +169,13 @@ class Analysis:
             return data
     def train_invoice_analysis(self):
 
-        姓名 = ""#
-        时间 = ""#
+        姓名 = self.analysis_index(key=r'(\d{10}[\d\*]{8})([^\d]+)', direction="like")#
+        时间 = self.analysis_index(key=r'\d{4}年\d{2}月\d{2}日\d{2}:\d{2}', direction="like")#
         出发地 = ""#
+        价格 = self.analysis_index(key='￥', direction="like")#
         到达地 = ""#
 
-        data = {"姓名": 姓名, "时间": 时间, "出发地": 出发地, "到达地": 到达地}
+        data = {"姓名": 姓名, "时间": 时间, "出发地": 出发地, "到达地": 到达地,"价格":价格}
         print(self.data)
         return data
 
@@ -206,10 +221,59 @@ class Analysis:
         return data
 
     def pay_invoice_analysis(self):
-
-        data = {}
+        银行卡号 = self.analysis_index(key=r"(\d{5,6}[\*]+)([\d]{4})", direction="like")
+        金额 = self.analysis_index(key=r"(金额:)?RMB\:?\d+(\.\d+)?[\d)]$", direction="like")
+        商户名称 = self.analysis_index(key="商户名称:", direction="like")
+        时间 = self.analysis_index(key=r'(\d{4}[/\.-]\d{2}[/\.-]\d{2})\s*?(\d{2}:\d{2}:\d{2})', direction="like")
+        银行名称=""
+        if 银行卡号:
+            银行名称=self.get_bank_name(银行卡号[0])
+        data = {"银行名称":银行名称,"银行卡号":银行卡号,"金额":金额,"时间":时间,"商户名称":商户名称}
         print(data)
         return data
+
+
+    def detail_invoice_analysis(self):
+        时间 = self.analysis_index(key=r'(\d{4}[/\.-]\d{2}[/\.-]\d{2})\s*?(\d{2}:\d{2}:\d{2})', direction="like")
+        商品说明 = self.analysis_index(key='商品说明', direction="like")
+        付款方式 = self.analysis_index(key='付款方式', direction="like")
+        收款方 = self.analysis_index(key='收款方', direction="like")
+        金额 = self.analysis_index(key='<账单详情', direction="below",below_height=3)
+        商户 = self.analysis_index(key="<账单详情", direction="below")
+
+        data = {"商户":商户,"金额":金额,"收款方":收款方,"付款方式":付款方式,"时间":时间,"商品说明":商品说明}
+        print(data)
+        return data
+
+    # 银行卡号BIN段示例（这里只列出了一些常见的银行）
+    BANK_BIN_DICT = {
+        "中国工商银行": ["6222", "6226", "6227", "6228", "6212", "6216"],
+        "中国建设银行": ["6227", "6228", "6258"],
+        "中国农业银行": ["6225", "6223", "6251"],
+        "中国银行": ["6232", "6213", "6222", "6217"],
+        "交通银行": ["6222", "6215", "6225"],
+        "招商银行": ["6225", "6219", "6212", "6210"],
+        "兴业银行": ["6229", "6230"],
+        "中信银行": ["6223", "6225", "6210"],
+        "浦发银行": ["6213", "6221"],
+        "广发银行": ["6212", "6227"],
+        "VISA": ["4"],  # VISA卡的BIN是以4开头
+        "MasterCard": ["5"],  # MasterCard卡的BIN是以5开头
+        "美国运通": ["34", "37"],  # AMEX卡的BIN是以34或37开头
+        "发现卡": ["6011"]  # Discover卡的BIN是以6011开头
+    }
+    def get_bank_name(self,card_number):
+        # 获取银行卡号的前六位作为BIN号段
+        cleaned_card_number = re.sub(r'\D', '', card_number)
+        bin_prefix = cleaned_card_number[:6]
+        
+        # 查找卡号对应的银行
+        for bank_name, bin_list in self.BANK_BIN_DICT.items():
+            for bin in bin_list:
+                if bin_prefix.startswith(bin):
+                    return bank_name
+
+        return "无法识别该银行卡"
     
     def clean_data(self,key,data_list):
         # 使用列表推导式移除与 `key` 相等的项

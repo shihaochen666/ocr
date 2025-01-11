@@ -25,7 +25,7 @@ async def ocr_analysis(ocr_type:str,file: UploadFile = File(...)):
     except Exception as e:
         return {"error": f"Failed to process image: {str(e)}"}
 
-    result = Analysis(img)
+    result = Analysis(ocr_type,img)
     return {"analysis_result": result.data_handle(ocr_type)}
     # 根据 OCR 类型进行分析
     # if ocr_type == "OrdinaryInvoice":

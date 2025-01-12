@@ -50,6 +50,30 @@ class Analysis:
             data["x_offset_up"] = data["index_3"] + data["filed_height"] * 3
             data["x_offset_low"] = data["index_7"] - data["filed_height"] * 3
             self.middle_y = (max(data["index_2"]) - min(data["index_2"])) / 2
+            self.middle_x = (max(data["index_3"]) - min(data["index_3"])) / 2        
+        elif ocr_type == 'ordinary_invoice':
+            # 行高容错设置
+            data["row_height"] = abs(data["index_4"] - data["index_6"]) / 2.5
+            data["filed_height"] = data["index_6"] - data["index_4"]
+            data["filed_length"] = data["index_3"] - data["index_7"]
+
+            data["y_offset_up"] = data["index_2"] + data["filed_height"] * 0.5
+            data["y_offset_low"] = data["index_2"] - data["filed_height"] * 0.5
+            data["x_offset_up"] = data["index_3"] + data["filed_height"] * 0.5
+            data["x_offset_low"] = data["index_7"] - data["filed_height"] * 0.5
+            self.middle_y = (max(data["index_2"]) - min(data["index_2"])) / 2
+            self.middle_x = (max(data["index_3"]) - min(data["index_3"])) / 2
+        elif ocr_type == 'smart_invoice':
+            # 行高容错设置
+            data["row_height"] = abs(data["index_4"] - data["index_6"]) / 2.5
+            data["filed_height"] = data["index_6"] - data["index_4"]
+            data["filed_length"] = data["index_3"] - data["index_7"]
+
+            data["y_offset_up"] = data["index_2"] + data["filed_height"] * 0.5
+            data["y_offset_low"] = data["index_2"] - data["filed_height"] * 0.5
+            data["x_offset_up"] = data["index_3"] + data["filed_height"] * 0.5
+            data["x_offset_low"] = data["index_7"] - data["filed_height"] * 0.5
+            self.middle_y = (max(data["index_2"]) - min(data["index_2"])) / 2
             self.middle_x = (max(data["index_3"]) - min(data["index_3"])) / 2
         else:
             # 行高容错设置
@@ -57,10 +81,10 @@ class Analysis:
             data["filed_height"] = data["index_6"] - data["index_4"]
             data["filed_length"] = data["index_3"] - data["index_7"]
 
-            data["y_offset_up"] = data["index_2"] + data["filed_height"] * 3
-            data["y_offset_low"] = data["index_2"] - data["filed_height"] * 3
-            data["x_offset_up"] = data["index_3"] + data["filed_height"] * 3
-            data["x_offset_low"] = data["index_7"] - data["filed_height"] * 3
+            data["y_offset_up"] = data["index_2"] + data["filed_height"] * 1
+            data["y_offset_low"] = data["index_2"] - data["filed_height"] * 1
+            data["x_offset_up"] = data["index_3"] + data["filed_height"] * 1
+            data["x_offset_low"] = data["index_7"] - data["filed_height"] * 1
             self.middle_y = (max(data["index_2"]) - min(data["index_2"])) / 2
             self.middle_x = (max(data["index_3"]) - min(data["index_3"])) / 2
 
@@ -232,6 +256,14 @@ class Analysis:
         print(data)
         return data
 
+    def smart_invoice_analysis(self):
+        时间 = self.analysis_index(key=r'^(2\d{3}-?\d{2}-?\d{2})$', direction="like")
+        发票号码 = self.analysis_index(key='发票号码', direction="like")
+
+
+        data={"发票号码":发票号码,"时间":时间}
+        print(data)
+        return data
 
     def detail_invoice_analysis(self):
         时间 = self.analysis_index(key=r'(\d{4}[/\.-]\d{2}[/\.-]\d{2})\s*?(\d{2}:\d{2}:\d{2})', direction="like")
@@ -307,6 +339,9 @@ class Analysis:
         if end_key is not None:
             end_key = end_key.strip()
             end_in_words = self.data[self.data['key'].str.startswith(end_key, na=False)]
+            if end_in_words.empty:
+                print(f"Error: No data found for key: {key} and end_key: {end_key}")
+                return None  # 或者你可以返回一个默认值
             end_row = end_in_words.iloc[0]
         if not start_in_words.empty:
             first_row = start_in_words.iloc[0]

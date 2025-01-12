@@ -173,6 +173,7 @@ class Analysis:
         if len(价税合计) != 0 and ":" in 价税合计[0] and not 价税合计[0].endswith(":"):
             价税合计 = 价税合计[0].split(":")[1]
             pattern = r'[1234567890¥.]*'
+
             matches = re.findall(pattern, 价税合计)
             价税合计小写 = [match for match in matches if match][0]
             价税合计大写 = 价税合计.replace(价税合计小写, "")

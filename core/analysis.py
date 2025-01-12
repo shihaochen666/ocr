@@ -171,7 +171,8 @@ class Analysis:
         价税合计大写, 价税合计小写 = "未知", "未知"
         价税合计 = self.analysis_index(key="价税合计", direction="like")
         if len(价税合计) != 0 and ":" in 价税合计[0] and not 价税合计[0].endswith(":"):
-            价税合计 = 价税合计[0].split(":")[1]
+            价税合计 = 价税合计[0].split(":")[1].replace("小写", "").replace("(", "").replace(")", "")
+            ""
             pattern = r'[1234567890¥.]*'
 
             matches = re.findall(pattern, 价税合计)

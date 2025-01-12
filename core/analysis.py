@@ -247,9 +247,14 @@ class Analysis:
     def pay_invoice_analysis(self):
         银行卡号 = self.analysis_index(key=r"(\d{5,6}[\*]+)([\d]{4})", direction="like")
         金额 = self.analysis_index(key=r"(金额:)?RMB\:?\d+(\.\d+)?[\d)]$", direction="like")
-        商户名称 = self.analysis_index(key="商户名称:", direction="like")
+        商户名称 = self.analysis_index(key="商户名称", direction="like")
+        if 商户名称[0].endswith(":"):
+            商户名称 = self.analysis_index(key="商户名称", direction="like",like_index=1)
         时间 = self.analysis_index(key=r'(\d{4}[/\.-]\d{2}[/\.-]\d{2})\s*?(\d{2}:\d{2}:\d{2})', direction="like")
         银行名称=""
+
+
+
         if 银行卡号:
             银行名称=self.get_bank_name(银行卡号[0])
         data = {"银行名称":银行名称,"银行卡号":银行卡号,"金额":金额,"时间":时间,"商户名称":商户名称}
@@ -311,7 +316,7 @@ class Analysis:
         # 使用列表推导式移除与 `key` 相等的项
         return [item for item in data_list if item != key]
 
-    def analysis_index(self, key, direction, end_key=None, block=-1, below_height=2):
+    def analysis_index(self, key, direction, end_key=None, block=-1, below_height=2,like_index = 0):
 
         """
         解析key 方向的匹配
@@ -335,7 +340,15 @@ class Analysis:
             expr = 'key.str.contains(@key, case=False, na=False)'
             expr += append_block_filter
             curr_key = self.data.query(expr, engine='python')
-            return self.clean_data(key,curr_key["key"].tolist())
+            if curr_key.empty or like_index ==0:
+                return self.clean_data(key, curr_key["key"].tolist())
+            next_row_index = curr_key.index[0] + like_index
+            # 判断下一行是否存在
+            if next_row_index < len(self.data):
+                next_row = self.data.iloc[next_row_index+1]
+            else:
+                next_row = None  # 如果没有下一行数据，则返回 None
+            return next_row["key"] if next_row is not None else None
         if end_key is not None:
             end_key = end_key.strip()
             end_in_words = self.data[self.data['key'].str.startswith(end_key, na=False)]

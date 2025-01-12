@@ -248,7 +248,7 @@ class Analysis:
         银行卡号 = self.analysis_index(key=r"(\d{5,6}[\*]+)([\d]{4})", direction="like")
         金额 = self.analysis_index(key=r"(金额:)?RMB\:?\d+(\.\d+)?[\d)]$", direction="like")
         商户名称 = self.analysis_index(key="商户名称", direction="like")
-        if 商户名称[0].endswith(":"):
+        if 商户名称 and 商户名称[0].endswith(":"):
             商户名称 = self.analysis_index(key="商户名称", direction="like",like_index=1)
         时间 = self.analysis_index(key=r'(\d{4}[/\.-]\d{2}[/\.-]\d{2})\s*?(\d{2}:\d{2}:\d{2})', direction="like")
         银行名称=""
@@ -345,7 +345,7 @@ class Analysis:
             next_row_index = curr_key.index[0] + like_index
             # 判断下一行是否存在
             if next_row_index < len(self.data):
-                next_row = self.data.iloc[next_row_index+1]
+                next_row = self.data.loc[next_row_index]
             else:
                 next_row = None  # 如果没有下一行数据，则返回 None
             return next_row["key"] if next_row is not None else None

@@ -252,8 +252,8 @@ class Analysis:
         银行卡号 = self.analysis_index(key=r"(\d{5,6}[\*]+)([\d]{4})", direction="like")
         金额 = self.analysis_index(key=r"(金额:)?RMB\:?\d+(\.\d+)?[\d)]$", direction="like")
         商户名称 = self.analysis_index(key="商户名称", direction="like")
-        if len(商户名称) ==0 or 商户名称[0].endswith(":"):
-            商户名称 = self.analysis_index(start_key="商户名称", direction="below")[:1]
+        if len(商户名称) == 0 or 商户名称[0].endswith(":"):
+            商户名称 = self.analysis_index(start_key="商户名称", row_index=1)
         时间 = self.analysis_index(key=r'(\d{4}[/\.-]\d{2}[/\.-]\d{2})\s*?(\d{2}:\d{2}:\d{2})', direction="like")
         银行名称 = ""
 
@@ -277,7 +277,7 @@ class Analysis:
         付款方式 = self.analysis_index(key='付款方式', direction="right")
         收款方 = self.analysis_index(key='收款方全称', direction="right")
         金额 = self.analysis_index(key=r'^-.*\.', direction="like")
-        商户 = self.analysis_index(key=r'^-.*\.', direction="like", like_index=-1)
+        商户 = self.analysis_index(start_key=r'^-.*\.', row_index=-1)
 
         data = {"商户": 商户, "金额": 金额, "收款方": 收款方, "付款方式": 付款方式, "时间": 时间, "商品说明": 商品说明}
         print(data)
@@ -318,7 +318,8 @@ class Analysis:
         # 使用列表推导式移除与 `key` 相等的项
         return [item for item in data_list if key not in item]
 
-    def analysis_index(self, direction, key=None, end_key=None, block=-1, below_height=2, like_index=0, start_key=None):
+    def analysis_index(self, direction=None, key=None, end_key=None, block=-1, below_height=2, row_index=0,
+                       start_key=None):
 
         """
         解析key 方向的匹配
@@ -342,19 +343,24 @@ class Analysis:
             start_in_words = self.data.query('key.str.contains("^" + @start_key, case=False, na=False)',
                                              engine='python')
             key = start_key
+
+        # 按行范围查找，并返回偏移行
+        if not start_in_words.empty and row_index != 0:
+            first_row = start_in_words.iloc[0]
+            curr_index = start_in_words.index[0]
+            query_str = f' {first_row["x_offset_low"]} < index_3 and {first_row["x_offset_up"]} > index_7'
+            filter_values_words_value = self.data.query(query_str).sort_values(by='index_2', ascending=True)
+            if not filter_values_words_value.empty:
+                curr_loc = filter_values_words_value.index.get_loc(curr_index)
+                next_row = filter_values_words_value.iloc[curr_loc+row_index]
+                return next_row["key"] if next_row is not None else None
+
         if direction == "like":
             expr = 'key.str.contains(@key, case=False, na=False)'
             expr += append_block_filter
             curr_key = self.data.query(expr, engine='python')
-            if curr_key.empty or like_index == 0:
-                return self.clean_data(key, curr_key["key"].tolist())
-            next_row_index = curr_key.index[0] + like_index
-            # 判断下一行是否存在
-            if next_row_index < len(self.data):
-                next_row = self.data.loc[next_row_index]
-            else:
-                next_row = None  # 如果没有下一行数据，则返回 None
-            return next_row["key"] if next_row is not None else None
+            if not curr_key.empty:
+                return curr_key["key"].tolist()
         if end_key is not None:
             end_key = end_key.strip()
             end_in_words = self.data[self.data['key'].str.startswith(end_key, na=False)]
@@ -383,13 +389,11 @@ class Analysis:
                 query_str += append_block_filter
                 filter_values_words_value = self.data.query(query_str)
 
-
             elif end_key is not None and direction == "below":
                 # 左对齐 或右对齐
                 query_str = f' {first_row["x_offset_low"]} < index_3 and {first_row["x_offset_up"]} > index_7 and  {end_row["index_2"]} > y_offset_low  and {end_row["index_2"]} < y_offset_up'
                 query_str += append_block_filter
                 filter_values_words_value = self.data.query(query_str)
-
             return self.clean_data(key, filter_values_words_value["key"].tolist())
         else:
             return []

@@ -264,7 +264,11 @@ class Analysis:
         data={"发票号码":发票号码,"时间":时间}
         print(data)
         return data
-
+    def plane_invoice_analysis(self):
+        
+        data={}
+        print(data)
+        return data
     def detail_invoice_analysis(self):
         时间 = self.analysis_index(key=r'(\d{4}[/\.-]\d{2}[/\.-]\d{2})\s*?(\d{2}:\d{2}:\d{2})', direction="like")
         商品说明 = self.analysis_index(key='商品说明', direction="like")

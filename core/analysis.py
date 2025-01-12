@@ -7,7 +7,7 @@ from pandas import merge_asof
 
 class Analysis:
 
-    def __init__(self,ocr_type, img_stream):
+    def __init__(self, ocr_type, img_stream):
 
         pd.set_option('display.max_colwidth', None)
         pd.set_option('display.max_rows', None)
@@ -40,7 +40,7 @@ class Analysis:
         data = pd.DataFrame(data)
         data = data.sort_values(by=['index_1', 'index_2'], ascending=[True, True])
         if ocr_type == 'vat_invoice':
-              # 行高容错设置
+            # 行高容错设置
             data["row_height"] = abs(data["index_4"] - data["index_6"]) / 2
             data["filed_height"] = data["index_6"] - data["index_4"]
             data["filed_length"] = data["index_3"] - data["index_7"]
@@ -50,7 +50,7 @@ class Analysis:
             data["x_offset_up"] = data["index_3"] + data["filed_height"] * 3
             data["x_offset_low"] = data["index_7"] - data["filed_height"] * 3
             self.middle_y = (max(data["index_2"]) - min(data["index_2"])) / 2
-            self.middle_x = (max(data["index_3"]) - min(data["index_3"])) / 2        
+            self.middle_x = (max(data["index_3"]) - min(data["index_3"])) / 2
         elif ocr_type == 'ordinary_invoice':
             # 行高容错设置
             data["row_height"] = abs(data["index_4"] - data["index_6"]) / 2.5
@@ -94,7 +94,6 @@ class Analysis:
     def data_handle(self, ocr_type: str):
         keys = self.data["key"].tolist()
         return getattr(self, ocr_type + "_analysis")()
-
 
     def merge_raw_data(self, fileds: dict):
         """
@@ -154,52 +153,54 @@ class Analysis:
                     merge(filtered_df)
 
     def vat_invoice_analysis(self):
-            # 需要合并的字段
-            fileds = {"收款人:": 0.3}
+        # 需要合并的字段
+        fileds = {"收款人:": 0.3}
 
-            self.merge_raw_data(fileds)
-            名称 = self.analysis_index(key="名称:", direction="like")
-            if 名称 and len(名称) > 0:
-                购买方名称 = 名称[0].split(":")[1]
-            else:
-                购买方名称 = "未知购买方名称"  # 或记录日志
+        self.merge_raw_data(fileds)
+        名称 = self.analysis_index(key="名称:", direction="like")
+        if 名称 and len(名称) > 0:
+            购买方名称 = 名称[0].split(":")[1]
+        else:
+            购买方名称 = "未知购买方名称"  # 或记录日志
 
-            if 名称 and len(名称) > 1:
-                销售方名称 = 名称[1].split(":")[1]
-            else:
-                销售方名称 = "未知销售方名称"  # 或记录日志
-            价税合计 = self.analysis_index(key=r'([壹贰叁肆伍陆柒捌玖拾佰仟零]+(?:零)?)*[圆园元](?:[零壹贰叁肆伍陆柒捌玖拾]+角)?(?:[零壹贰叁肆伍陆捌玖拾]+分)?(?:整)?', direction="like")
-            价税合计大写 = "未知"
-            if 价税合计 :
-                价税合计大写=价税合计[0]
-            价税合计小写 = self.analysis_index(key="(小写)", direction="like")
-            开票日期 = self.analysis_index(key="开票日期:", direction="like")
-            发票号码 = self.analysis_index(key="发票号码:", direction="like")
-            开票人 = self.analysis_index(key="开票人:", direction="like")
+        if 名称 and len(名称) > 1:
+            销售方名称 = 名称[1].split(":")[1]
+        else:
+            销售方名称 = "未知销售方名称"  # 或记录日志
+        价税合计 = self.analysis_index(
+            key=r'([壹贰叁肆伍陆柒捌玖拾佰仟零]+(?:零)?)*[圆园元](?:[零壹贰叁肆伍陆柒捌玖拾]+角)?(?:[零壹贰叁肆伍陆捌玖拾]+分)?(?:整)?',
+            direction="like")
+        价税合计大写 = "未知"
+        if 价税合计:
+            价税合计大写 = 价税合计[0]
+        价税合计小写 = self.analysis_index(key="(小写)", direction="like")
+        开票日期 = self.analysis_index(key="开票日期:", direction="like")
+        发票号码 = self.analysis_index(key="发票号码:", direction="like")
+        开票人 = self.analysis_index(key="开票人:", direction="like")
 
+        购买方纳税人识别号 = ""  # self.analysis_index(key="纳税人识别号:", direction="like", block=1)[0].split(":")[1]
+        销售方方纳税人识别号 = ""  # self.analysis_index(key="纳税人识别号:", direction="like", block=3)[0].split(":")[1]
+        税率 = self.analysis_index(key="税率", direction="below")
+        购买方开户行及账号 = ""  # self.analysis_index(key="开户行及账号", direction="like", block=3)
+        销售方方开户行及账号 = ""  # self.analysis_index(key="开户行及账号", direction="like", block=1)
 
-            购买方纳税人识别号 = ""#self.analysis_index(key="纳税人识别号:", direction="like", block=1)[0].split(":")[1]
-            销售方方纳税人识别号 = ""#self.analysis_index(key="纳税人识别号:", direction="like", block=3)[0].split(":")[1]
-            税率 = self.analysis_index(key="税率", direction="below")
-            购买方开户行及账号 = ""#self.analysis_index(key="开户行及账号", direction="like", block=3)
-            销售方方开户行及账号 = ""#self.analysis_index(key="开户行及账号", direction="like", block=1)
+        收款人 = self.analysis_index(key="收款人:", direction="like", block=1)
 
-            收款人 = self.analysis_index(key="收款人:", direction="like", block=1)
+        print(self.data)
+        data = {"开票日期": 开票日期, "发票号码": 发票号码, "购买方名称": 购买方名称, "销售方名称": 销售方名称,
+                "价税合计大写": 价税合计大写, "价税合计小写": 价税合计小写, "开票人": 开票人}
+        print(data)
+        return data
 
-            print(self.data)
-            data = {"开票日期": 开票日期, "发票号码": 发票号码, "购买方名称": 购买方名称, "销售方名称": 销售方名称,
-                "价税合计大写": 价税合计大写,"价税合计小写": 价税合计小写, "开票人": 开票人}
-            print(data)
-            return data
     def train_invoice_analysis(self):
 
-        姓名 = self.analysis_index(key=r'(\d{10}[\d\*]{8})([^\d]+)', direction="like")#
-        时间 = self.analysis_index(key=r'\d{4}年\d{2}月\d{2}日\d{2}:\d{2}', direction="like")#
-        出发地 = ""#
-        价格 = self.analysis_index(key='￥', direction="like")#
-        到达地 = ""#
+        姓名 = self.analysis_index(key=r'(\d{10}[\d\*]{8})([^\d]+)', direction="like")  #
+        时间 = self.analysis_index(key=r'\d{4}年\d{2}月\d{2}日\d{2}:\d{2}', direction="like")  #
+        出发地 = ""  #
+        价格 = self.analysis_index(key='￥', direction="like")  #
+        到达地 = ""  #
 
-        data = {"姓名": 姓名, "时间": 时间, "出发地": 出发地, "到达地": 到达地,"价格":价格}
+        data = {"姓名": 姓名, "时间": 时间, "出发地": 出发地, "到达地": 到达地, "价格": 价格}
         print(self.data)
         return data
 
@@ -218,10 +219,12 @@ class Analysis:
             销售方名称 = 名称[1].split(":")[1]
         else:
             销售方名称 = "未知销售方名称"  # 或记录日志
-        价税合计 = self.analysis_index(key=r'([壹贰叁肆伍陆柒捌玖拾佰仟零]+(?:零)?)*[圆园元](?:[零壹贰叁肆伍陆柒捌玖拾]+角)?(?:[零壹贰叁肆伍陆捌玖拾]+分)?(?:整)?', direction="like")
+        价税合计 = self.analysis_index(
+            key=r'([壹贰叁肆伍陆柒捌玖拾佰仟零]+(?:零)?)*[圆园元](?:[零壹贰叁肆伍陆柒捌玖拾]+角)?(?:[零壹贰叁肆伍陆捌玖拾]+分)?(?:整)?',
+            direction="like")
         价税合计大写 = "未知"
-        if 价税合计 :
-            价税合计大写=价税合计[0]
+        if 价税合计:
+            价税合计大写 = 价税合计[0]
         价税合计小写 = self.analysis_index(key="(小写)", direction="like")
         开票日期 = self.analysis_index(key="开票日期:", direction="like")
         发票号码 = self.analysis_index(key="发票号码:", direction="like")
@@ -236,11 +239,12 @@ class Analysis:
         金额合计 = self.analysis_index(key="金额", end_key="￥", direction="below")
         税额合计 = self.analysis_index(key="税额", end_key="￥", direction="below")
         if 金额合计:
-            金额合计=金额合计[0]
+            金额合计 = 金额合计[0]
 
         data = {"开票日期": 开票日期, "发票号码": 发票号码, "购买方名称": 购买方名称, "销售方名称": 销售方名称,
-                "价税合计大写": 价税合计大写,"价税合计小写": 价税合计小写, "项目名称": 项目名称,
-                "规格型号": 规格型号, "单位": 单位, "数量": 数量, "金额": 金额,"税额":税额,"金额合计":金额合计, "税额合计": 税额合计, "开票人": 开票人}
+                "价税合计大写": 价税合计大写, "价税合计小写": 价税合计小写, "项目名称": 项目名称,
+                "规格型号": 规格型号, "单位": 单位, "数量": 数量, "金额": 金额, "税额": 税额, "金额合计": 金额合计,
+                "税额合计": 税额合计, "开票人": 开票人}
         print(data)
         return data
 
@@ -248,16 +252,14 @@ class Analysis:
         银行卡号 = self.analysis_index(key=r"(\d{5,6}[\*]+)([\d]{4})", direction="like")
         金额 = self.analysis_index(key=r"(金额:)?RMB\:?\d+(\.\d+)?[\d)]$", direction="like")
         商户名称 = self.analysis_index(key="商户名称", direction="like")
-        if 商户名称 and 商户名称[0].endswith(":"):
-            商户名称 = self.analysis_index(key="商户名称", direction="like",like_index=1)
+        if len(商户名称) ==0 or 商户名称[0].endswith(":"):
+            商户名称 = self.analysis_index(start_key="商户名称", direction="below")[:1]
         时间 = self.analysis_index(key=r'(\d{4}[/\.-]\d{2}[/\.-]\d{2})\s*?(\d{2}:\d{2}:\d{2})', direction="like")
-        银行名称=""
-
-
+        银行名称 = ""
 
         if 银行卡号:
-            银行名称=self.get_bank_name(银行卡号[0])
-        data = {"银行名称":银行名称,"银行卡号":银行卡号,"金额":金额,"时间":时间,"商户名称":商户名称}
+            银行名称 = self.get_bank_name(银行卡号[0])
+        data = {"银行名称": 银行名称, "银行卡号": 银行卡号, "金额": 金额, "时间": 时间, "商户名称": 商户名称}
         print(data)
         return data
 
@@ -265,8 +267,7 @@ class Analysis:
         时间 = self.analysis_index(key=r'^(2\d{3}-?\d{2}-?\d{2})$', direction="like")
         发票号码 = self.analysis_index(key='发票号码', direction="like")
 
-
-        data={"发票号码":发票号码,"时间":时间}
+        data = {"发票号码": 发票号码, "时间": 时间}
         print(data)
         return data
     def plane_invoice_analysis(self):
@@ -276,13 +277,13 @@ class Analysis:
         return data
     def detail_invoice_analysis(self):
         时间 = self.analysis_index(key=r'(\d{4}[/\.-]\d{2}[/\.-]\d{2})\s*?(\d{2}:\d{2}:\d{2})', direction="like")
-        商品说明 = self.analysis_index(key='商品说明', direction="like")
-        付款方式 = self.analysis_index(key='付款方式', direction="like")
-        收款方 = self.analysis_index(key='收款方', direction="like")
-        金额 = self.analysis_index(key='<账单详情', direction="below",below_height=3)
-        商户 = self.analysis_index(key="<账单详情", direction="below")
+        商品说明 = self.analysis_index(key='商品说明', direction="right")
+        付款方式 = self.analysis_index(key='付款方式', direction="right")
+        收款方 = self.analysis_index(key='收款方全称', direction="right")
+        金额 = self.analysis_index(key=r'^-.*\.', direction="like")
+        商户 = self.analysis_index(key=r'^-.*\.', direction="like", like_index=-1)
 
-        data = {"商户":商户,"金额":金额,"收款方":收款方,"付款方式":付款方式,"时间":时间,"商品说明":商品说明}
+        data = {"商户": 商户, "金额": 金额, "收款方": 收款方, "付款方式": 付款方式, "时间": 时间, "商品说明": 商品说明}
         print(data)
         return data
 
@@ -341,7 +342,7 @@ class Analysis:
         # 获取银行卡号的前六位作为BIN号段
         cleaned_card_number = re.sub(r'\D', '', card_number)
         bin_prefix = cleaned_card_number[:6]
-        
+
         # 查找卡号对应的银行
         for bank_name, bin_list in self.BANK_BIN_DICT.items():
             for bin in bin_list:
@@ -349,12 +350,12 @@ class Analysis:
                     return bank_name
 
         return "无法识别该银行卡"
-    
-    def clean_data(self,key,data_list):
-        # 使用列表推导式移除与 `key` 相等的项
-        return [item for item in data_list if item != key]
 
-    def analysis_index(self, key, direction, end_key=None, block=-1, below_height=2,like_index = 0):
+    def clean_data(self, key, data_list):
+        # 使用列表推导式移除与 `key` 相等的项
+        return [item for item in data_list if key not in item]
+
+    def analysis_index(self, direction, key=None, end_key=None, block=-1, below_height=2, like_index=0, start_key=None):
 
         """
         解析key 方向的匹配
@@ -374,11 +375,15 @@ class Analysis:
             append_block_filter = f"and index_2 <= {self.middle_y} and index_7 >= {self.middle_x}"
 
         start_in_words = self.data.query(f'key=="{key}"')
+        if start_key:
+            start_in_words = self.data.query('key.str.contains("^" + @start_key, case=False, na=False)',
+                                             engine='python')
+            key = start_key
         if direction == "like":
             expr = 'key.str.contains(@key, case=False, na=False)'
             expr += append_block_filter
             curr_key = self.data.query(expr, engine='python')
-            if curr_key.empty or like_index ==0:
+            if curr_key.empty or like_index == 0:
                 return self.clean_data(key, curr_key["key"].tolist())
             next_row_index = curr_key.index[0] + like_index
             # 判断下一行是否存在
@@ -415,19 +420,21 @@ class Analysis:
                 query_str += append_block_filter
                 filter_values_words_value = self.data.query(query_str)
 
+
             elif end_key is not None and direction == "below":
                 # 左对齐 或右对齐
                 query_str = f' {first_row["x_offset_low"]} < index_3 and {first_row["x_offset_up"]} > index_7 and  {end_row["index_2"]} > y_offset_low  and {end_row["index_2"]} < y_offset_up'
                 query_str += append_block_filter
                 filter_values_words_value = self.data.query(query_str)
-            return self.clean_data(key,filter_values_words_value["key"].tolist())
+
+            return self.clean_data(key, filter_values_words_value["key"].tolist())
         else:
             return []
 
 
 if __name__ == '__main__':
     ao = Analysis("../imgs/电子发票/IMG_20241231_141457.jpg")
-    #ao.data_handle("ordinary_invoice")
+    # ao.data_handle("ordinary_invoice")
     ao.analysis_index(key="价税合计(大写)", direction="right", end_key="小写")
     # ao.analysis_index(key="项目名称", direction="below")
     # ao.analysis_index(key="规格型号", direction="below")

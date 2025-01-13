@@ -165,12 +165,17 @@ class Analysis:
         self.merge_raw_data(fileds)
         print(self.data)
 
-        销售方名称 = self.analysis_index(key="称:", direction="like", block=1)
-        if len(销售方名称) == 1:
-            销售方名称 = [销售方名称[0].split(":")[1]]
-        购买方名称 = self.analysis_index(key="称:", direction="like", block=3)
-        if len(购买方名称) == 1:
-            购买方名称 = [购买方名称[0].split(":")[1]]
+        名称 = self.analysis_index(key="称:", direction="like")
+        if len(名称)==2:
+            购买方名称 = 名称[0].split(":")[1]
+            销售方名称 = 名称[1].split(":")[1]
+        else:
+            销售方名称 = self.analysis_index(key="称:", direction="like", block=1)
+            if len(销售方名称) == 1:
+                销售方名称 = [销售方名称[0].split(":")[1]]
+            购买方名称 = self.analysis_index(key="称:", direction="like", block=3)
+            if len(购买方名称) == 1:
+                购买方名称 = [购买方名称[0].split(":")[1]]
 
         大写 = self.analysis_index(
             key=r'^([壹贰叁肆伍陆柒捌玖拾佰仟万亿零]+(?:零)?)*[圆园元](?:[零壹贰叁肆伍陆柒捌玖拾]+角)?(?:[零壹贰叁肆伍陆捌玖拾]+分)?(?:整)?',

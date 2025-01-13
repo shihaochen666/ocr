@@ -17,7 +17,7 @@ class Analysis:
         ocr = PaddleOCR(
             use_angle_cls=True,  # 启用方向分类器
             lang='ch',  # 使用简体中文模型
-            det_algorithm='DB',  # 文本检测算法选择DB   
+            det_algorithm='DB',  # 文本检测算法选择DB
             rec_algorithm='CRNN',  # 文本识别算法选择SVTR_LCNet
             use_space_char=True,
             layout=True,  # 启用布局分析
@@ -45,8 +45,8 @@ class Analysis:
             data["filed_height"] = data["index_6"] - data["index_4"]
             data["filed_length"] = data["index_3"] - data["index_7"]
 
-            data["y_offset_up"] = data["index_2"] + data["filed_height"] * 0.5
-            data["y_offset_low"] = data["index_2"] - data["filed_height"] * 0.5
+            data["y_offset_up"] = data["index_6"] + data["filed_height"] * 0
+            data["y_offset_low"] = data["index_2"] - data["filed_height"] * 0
             data["x_offset_up"] = data["index_3"] + data["filed_height"] * 2
             data["x_offset_low"] = data["index_7"] - data["filed_height"] * 2
             self.middle_y = (max(data["index_2"]) - min(data["index_2"])) / 2
@@ -57,7 +57,7 @@ class Analysis:
             data["filed_height"] = data["index_6"] - data["index_4"]
             data["filed_length"] = data["index_3"] - data["index_7"]
 
-            data["y_offset_up"] = data["index_2"] + data["filed_height"] * 0.5
+            data["y_offset_up"] = data["index_6"] + data["filed_height"] * 0.5
             data["y_offset_low"] = data["index_2"] - data["filed_height"] * 0.5
             data["x_offset_up"] = data["index_3"] + data["filed_height"] * 0.5
             data["x_offset_low"] = data["index_7"] - data["filed_height"] * 0.5
@@ -69,7 +69,7 @@ class Analysis:
             data["filed_height"] = data["index_6"] - data["index_4"]
             data["filed_length"] = data["index_3"] - data["index_7"]
 
-            data["y_offset_up"] = data["index_2"] + data["filed_height"] * 0.5
+            data["y_offset_up"] = data["index_6"] + data["filed_height"] * 0.5
             data["y_offset_low"] = data["index_2"] - data["filed_height"] * 0.5
             data["x_offset_up"] = data["index_3"] + data["filed_height"] * 0.5
             data["x_offset_low"] = data["index_7"] - data["filed_height"] * 0.5
@@ -81,8 +81,8 @@ class Analysis:
             data["filed_height"] = data["index_6"] - data["index_4"]
             data["filed_length"] = data["index_3"] - data["index_7"]
 
-            data["y_offset_up"] = data["index_2"] + data["filed_height"] * 1
-            data["y_offset_low"] = data["index_2"] - data["filed_height"] * 1
+            data["y_offset_up"] = data["index_6"] + data["filed_height"] * 0
+            data["y_offset_low"] = data["index_2"] - data["filed_height"] * 0
             data["x_offset_up"] = data["index_3"] + data["filed_height"] * 1
             data["x_offset_low"] = data["index_7"] - data["filed_height"] * 1
             self.middle_y = (max(data["index_2"]) - min(data["index_2"])) / 2
@@ -143,18 +143,19 @@ class Analysis:
                     curr_y_offset_up = curr_df.iloc[i]['y_offset_up']
                     y_offset_low = curr_df.iloc[i]['y_offset_low']
 
+                    # y：index_6 比index_2大 ; x：3比7大
                     merge_x_offset = curr_index_3 + curr_filed_length
                     filtered_df = self.data[
                         (self.data['index_3'] >= curr_index_3) &
                         (merge_x_offset >= self.data['index_7']) &
                         (curr_y_offset_up >= self.data['index_2']) &
-                        (self.data['index_2'] >= y_offset_low)
+                        (self.data['index_6'] >= y_offset_low)
                         ]
                     merge(filtered_df)
 
     def vat_invoice_analysis(self):
         # 需要合并的字段
-        fileds = {"收款人:": 0.3, "价税合计(大写)": 20}
+        fileds = {"价税合计(大写)": 5, "收款人:": 0.3, "称": 3, "开票日期:": 1, "开票人:": 0.5}
 
         self.merge_raw_data(fileds)
         print(self.data)
@@ -179,7 +180,7 @@ class Analysis:
             价税合计小写 = [match for match in matches if match][0]
             价税合计大写 = 价税合计.replace(价税合计小写, "")
         开票日期 = self.analysis_index(key="开票日期:", direction="like")
-        发票号码 = self.analysis_index(key="发票号码:", direction="like")
+        发票号码 = self.analysis_index(key="No", direction="like",block=4)
         开票人 = self.analysis_index(key="开票人:", direction="like")
 
         购买方纳税人识别号 = ""  # self.analysis_index(key="纳税人识别号:", direction="like", block=1)[0].split(":")[1]
@@ -447,9 +448,9 @@ class Analysis:
 
 
 if __name__ == '__main__':
-    ao = Analysis("../imgs/电子发票/IMG_20241231_141457.jpg")
-    # ao.data_handle("ordinary_invoice")
-    ao.analysis_index(key="价税合计(大写)", direction="right", end_key="小写")
+    ao = Analysis("vat_invoice", "../uploadfile/img_12.png")
+    ao.data_handle("vat_invoice")
+    # ao.analysis_index(key="价税合计(大写)", direction="right", end_key="小写")
     # ao.analysis_index(key="项目名称", direction="below")
     # ao.analysis_index(key="规格型号", direction="below")
     # ao.analysis_index(key="单位", direction="below")
@@ -470,3 +471,8 @@ if __name__ == '__main__':
 # ({first_row["x_offset_low"]} < index_7 < {first_row["x_offset_up"]}
 # and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height}
 # and index_2 != {first_row["index_2"]})'
+
+    # index_1  index_2  index_3  index_4  index_5  index_6  index_7  index_8  filed_length  y_offset_up  y_offset_low  x_offset_up  x_offset_low
+# 48    307.0   2068.0    858.0   2068.0    858.0   2143.0    307.0   2143.0   551.0       2075.5        2060.5       1008.0         157.0          价税合计(大写)
+# 49   1203.0   2068.0   1754.0   2068.0   1754.0   2156.0   1203.0   2156.0   551.0       2076.8        2059.2       1930.0        1027.0          肆佰伍拾圆整
+# 51   3174.0   2090.0   3524.0   2090.0   3524.0   2164.0   3174.0   2164.0   350.0       2090.0        2090.0       3672.0        3026.0  $450

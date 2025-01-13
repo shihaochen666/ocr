@@ -1,9 +1,9 @@
+import copy
 import time
 import re
 import pandas as pd
 from paddleocr import PaddleOCR
 from pandas import merge_asof
-
 
 class Analysis:
 
@@ -45,8 +45,8 @@ class Analysis:
             data["filed_height"] = data["index_6"] - data["index_4"]
             data["filed_length"] = data["index_3"] - data["index_7"]
 
-            data["y_offset_up"] = data["index_6"] + data["filed_height"] * 0
-            data["y_offset_low"] = data["index_2"] - data["filed_height"] * 0
+            data["y_offset_up"] = data["index_6"] + data["filed_height"] * -0.2
+            data["y_offset_low"] = data["index_2"] - data["filed_height"] * -0.2
             data["x_offset_up"] = data["index_3"] + data["filed_height"] * 2
             data["x_offset_low"] = data["index_7"] - data["filed_height"] * 2
             self.middle_y = (max(data["index_2"]) - min(data["index_2"])) / 2
@@ -90,6 +90,7 @@ class Analysis:
 
         print(data)
         self.data = data
+        self.data_copy = copy.copy(data)
 
     def data_handle(self, ocr_type: str):
         keys = self.data["key"].tolist()
@@ -149,7 +150,7 @@ class Analysis:
                         (self.data['index_3'] >= curr_index_3) &
                         (merge_x_offset >= self.data['index_7']) &
                         (curr_y_offset_up >= self.data['index_2']) &
-                        (self.data['index_6'] >= y_offset_low)
+                        (y_offset_low < self.data['index_6'])
                         ]
                     merge(filtered_df)
 
@@ -173,14 +174,23 @@ class Analysis:
         价税合计 = self.analysis_index(key="价税合计", direction="like")
         if len(价税合计) != 0 and ":" in 价税合计[0] and not 价税合计[0].endswith(":"):
             价税合计 = 价税合计[0].split(":")[1].replace("小写", "").replace("(", "").replace(")", "")
-            ""
             pattern = r'[1234567890¥.]*'
-
             matches = re.findall(pattern, 价税合计)
-            价税合计小写 = [match for match in matches if match][0]
-            价税合计大写 = 价税合计.replace(价税合计小写, "")
+            价税合计小写 = [match for match in matches if match]
+            if len(价税合计小写) > 1000000:
+                价税合计小写 = 价税合计小写[0]
+                价税合计大写 = 价税合计.replace(价税合计小写, "")
+            # 取不到再取一次
+            else:
+                key = r'([壹贰叁肆伍陆柒捌玖拾佰仟零]+(?:零)?)*[圆园元](?:[零壹贰叁肆伍陆柒捌玖拾]+角)?(?:[零壹贰叁肆伍陆捌玖拾]+分)?(?:整)?'
+                expr = f'key.str.contains(@key, case=False, na=False)'
+                curr_key = self.data_copy.query(expr, engine='python')
+                if not curr_key.empty:
+                    价税合计大写 = curr_key["key"].tolist()
+                    # TODO 大写转小写
+                    # 价税合计小写
         开票日期 = self.analysis_index(key="开票日期:", direction="like")
-        发票号码 = self.analysis_index(key="No", direction="like",block=4)
+        发票号码 = self.analysis_index(key="No", direction="like", block=4)
         开票人 = self.analysis_index(key="开票人:", direction="like")
 
         购买方纳税人识别号 = ""  # self.analysis_index(key="纳税人识别号:", direction="like", block=1)[0].split(":")[1]
@@ -448,7 +458,7 @@ class Analysis:
 
 
 if __name__ == '__main__':
-    ao = Analysis("vat_invoice", "../uploadfile/img_12.png")
+    ao = Analysis("vat_invoice", "../uploadfile/img_1.png")
     ao.data_handle("vat_invoice")
     # ao.analysis_index(key="价税合计(大写)", direction="right", end_key="小写")
     # ao.analysis_index(key="项目名称", direction="below")
@@ -472,7 +482,11 @@ if __name__ == '__main__':
 # and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height}
 # and index_2 != {first_row["index_2"]})'
 
-    # index_1  index_2  index_3  index_4  index_5  index_6  index_7  index_8  filed_length  y_offset_up  y_offset_low  x_offset_up  x_offset_low
+# index_1  index_2  index_3  index_4  index_5  index_6  index_7  index_8  filed_length  y_offset_up  y_offset_low  x_offset_up  x_offset_low
 # 48    307.0   2068.0    858.0   2068.0    858.0   2143.0    307.0   2143.0   551.0       2075.5        2060.5       1008.0         157.0          价税合计(大写)
 # 49   1203.0   2068.0   1754.0   2068.0   1754.0   2156.0   1203.0   2156.0   551.0       2076.8        2059.2       1930.0        1027.0          肆佰伍拾圆整
-# 51   3174.0   2090.0   3524.0   2090.0   3524.0   2164.0   3174.0   2164.0   350.0       2090.0        2090.0       3672.0        3026.0  $450
+# 51   3174.0   2090.0   3524.0   2090.0   3524.0   2164.0   3174.0   2164.0   350.0
+# 2090.0        2090.0       3672.0        3026.0  $450
+
+# 69   2619.0   1576.0   2891.0   1567.0   2893.0   1628.0   2621.0   1637.0
+# 80    931.0   1811.0   1479.0   1798.0   1481.0   1867.0    933.0   1880.0

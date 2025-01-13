@@ -3,7 +3,7 @@ import time
 import re
 import pandas as pd
 from paddleocr import PaddleOCR
-from pandas import merge_asof
+
 
 class Analysis:
 
@@ -12,7 +12,6 @@ class Analysis:
         pd.set_option('display.max_colwidth', None)
         pd.set_option('display.max_rows', None)
         pd.set_option('display.max_columns', None)
-
         data = []
         ocr = PaddleOCR(
             use_angle_cls=True,  # 启用方向分类器
@@ -45,8 +44,8 @@ class Analysis:
             data["filed_height"] = data["index_6"] - data["index_4"]
             data["filed_length"] = data["index_3"] - data["index_7"]
 
-            data["y_offset_up"] = data["index_6"] + data["filed_height"] * -0.2
-            data["y_offset_low"] = data["index_2"] - data["filed_height"] * -0.2
+            data["y_offset_up"] = data["index_6"] + data["filed_height"] * -2
+            data["y_offset_low"] = data["index_2"] - data["filed_height"] * -2
             data["x_offset_up"] = data["index_3"] + data["filed_height"] * 2
             data["x_offset_low"] = data["index_7"] - data["filed_height"] * 2
             self.middle_y = (max(data["index_2"]) - min(data["index_2"])) / 2
@@ -91,6 +90,7 @@ class Analysis:
         print(data)
         self.data = data
         self.data_copy = copy.copy(data)
+        self.result=result
 
     def data_handle(self, ocr_type: str):
         keys = self.data["key"].tolist()
@@ -107,7 +107,12 @@ class Analysis:
             if filtered_df.shape[0] >= 2:
                 indexes_list = filtered_df.index.tolist()
                 # 合并操作
-                first_key = str(filtered_df["key"].iloc[0]).replace(":", "")
+
+                first_key = str(filtered_df["key"].iloc[0])
+                if ":" in first_key and not first_key.endswith(":"):
+                    return
+
+                first_key = first_key.replace(":", "")
                 remaining_keys = filtered_df["key"].iloc[1:]
                 if join_flag:
                     new_key = first_key + ":" + "".join(remaining_keys.tolist())
@@ -156,10 +161,10 @@ class Analysis:
 
     def vat_invoice_analysis(self):
         # 需要合并的字段
-        fileds = {"价税合计(大写)": 5, "收款人:": 0.3, "称": 3, "开票日期:": 1, "开票人:": 0.5}
-
+        fileds = {"价税合计(大写)": 5, "收款人:": 0.3,  "开票人:": 0.5}
         self.merge_raw_data(fileds)
         print(self.data)
+
         销售方名称 = self.analysis_index(key="称:", direction="like", block=1)
         if len(销售方名称) == 1:
             销售方名称 = [销售方名称[0].split(":")[1]]
@@ -167,30 +172,37 @@ class Analysis:
         if len(购买方名称) == 1:
             购买方名称 = [购买方名称[0].split(":")[1]]
 
-        # 价税合计 = self.analysis_index(
-        #     key=r'([壹贰叁肆伍陆柒捌玖拾佰仟零]+(?:零)?)*[圆园元](?:[零壹贰叁肆伍陆柒捌玖拾]+角)?(?:[零壹贰叁肆伍陆捌玖拾]+分)?(?:整)?',
-        #     direction="like")
-        价税合计大写, 价税合计小写 = "未知", "未知"
-        价税合计 = self.analysis_index(key="价税合计", direction="like")
-        if len(价税合计) != 0 and ":" in 价税合计[0] and not 价税合计[0].endswith(":"):
-            价税合计 = 价税合计[0].split(":")[1].replace("小写", "").replace("(", "").replace(")", "")
-            pattern = r'[1234567890¥.]*'
-            matches = re.findall(pattern, 价税合计)
-            价税合计小写 = [match for match in matches if match]
-            if len(价税合计小写) > 1000000:
-                价税合计小写 = 价税合计小写[0]
-                价税合计大写 = 价税合计.replace(价税合计小写, "")
-            # 取不到再取一次
-            else:
-                key = r'([壹贰叁肆伍陆柒捌玖拾佰仟零]+(?:零)?)*[圆园元](?:[零壹贰叁肆伍陆柒捌玖拾]+角)?(?:[零壹贰叁肆伍陆捌玖拾]+分)?(?:整)?'
-                expr = f'key.str.contains(@key, case=False, na=False)'
-                curr_key = self.data_copy.query(expr, engine='python')
-                if not curr_key.empty:
-                    价税合计大写 = curr_key["key"].tolist()
-                    # TODO 大写转小写
-                    # 价税合计小写
-        开票日期 = self.analysis_index(key="开票日期:", direction="like")
-        发票号码 = self.analysis_index(key="No", direction="like", block=4)
+        大写 = self.analysis_index(
+            key=r'^([壹贰叁肆伍陆柒捌玖拾佰仟万亿零]+(?:零)?)*[圆园元](?:[零壹贰叁肆伍陆柒捌玖拾]+角)?(?:[零壹贰叁肆伍陆捌玖拾]+分)?(?:整)?',
+            direction="like")
+        小写 = self.analysis_index(key=r"\(小写\)[￥¥]\s*([0-9]+(?:[,0-9]*)*(?:\.\d{1,2})?)", direction="like")
+        价税合计大写, 价税合计小写 = 大写, 小写
+        if len(小写) == 0:
+            价税合计 = self.analysis_index(key="价税合计", direction="like")
+            if len(价税合计) != 0 and ":" in 价税合计[0] and not 价税合计[0].endswith(":"):
+                价税合计 = 价税合计[0].split(":")[1].replace("小写", "").replace("(", "").replace(")", "")
+                pattern = r'[1234567890¥.]*'
+                matches = re.findall(pattern, 价税合计)
+                价税合计小写 = [match for match in matches if match]
+                if len(价税合计小写) > 1:
+                    价税合计小写 = 价税合计小写[0]
+                #     价税合计大写 = 价税合计.replace(价税合计小写, "")
+                # # 取不到再取一次
+                # else:
+                #     key = r'([壹贰叁肆伍陆柒捌玖拾佰仟万亿零]+(?:零)?)*[圆园元](?:[零壹贰叁肆伍陆柒捌玖拾]+角)?(?:[零壹贰叁肆伍陆捌玖拾]+分)?(?:整)?'
+                #     expr = f'key.str.contains(@key, case=False, na=False)'
+                #     curr_key = self.data_copy.query(expr, engine='python')
+                #     if not curr_key.empty:
+                #         价税合计大写 = curr_key["key"].tolist()
+                #         # TODO 大写转小写
+                #         # 价税合计小写
+        # if  len(价税合计小写)==0:
+        #     价税合计小写=self.analysis_index(key=r"[￥¥]([0-9,]+(\.\d{1,2})?)", direction="like")
+
+
+        开票日期 = self.analysis_index(key=r'(\d{4}[年]\d{2}[月]\d{2})', direction="like")
+            
+        发票号码 = self.analysis_index(key=r"^No?\d+", direction="like")
         开票人 = self.analysis_index(key="开票人:", direction="like")
 
         购买方纳税人识别号 = ""  # self.analysis_index(key="纳税人识别号:", direction="like", block=1)[0].split(":")[1]
@@ -382,9 +394,10 @@ class Analysis:
         """
         解析key 方向的匹配
         :param key:
-        :param direction: below / right like
+        :param direction: below / right like 
         :return:
         """
+
 
         append_block_filter = ""
         if block == 1:
@@ -401,7 +414,7 @@ class Analysis:
             start_in_words = self.data.query('key.str.contains("^" + @start_key, case=False, na=False)',
                                              engine='python')
             key = start_key
-
+        filter_values_words_value=None
         # 按行范围查找，并返回偏移行
         if not start_in_words.empty and row_index != 0:
             first_row = start_in_words.iloc[0]
@@ -452,13 +465,15 @@ class Analysis:
                 query_str = f' {first_row["x_offset_low"]} < index_3 and {first_row["x_offset_up"]} > index_7 and  {end_row["index_2"]} > y_offset_low  and {end_row["index_2"]} < y_offset_up'
                 query_str += append_block_filter
                 filter_values_words_value = self.data.query(query_str)
+            if filter_values_words_value is None:
+                return ""
             return self.clean_data(key, filter_values_words_value["key"].tolist())
         else:
             return []
 
 
 if __name__ == '__main__':
-    ao = Analysis("vat_invoice", "../uploadfile/img_1.png")
+    ao = Analysis("vat_invoice", "../uploadfile/img_13.png")
     ao.data_handle("vat_invoice")
     # ao.analysis_index(key="价税合计(大写)", direction="right", end_key="小写")
     # ao.analysis_index(key="项目名称", direction="below")

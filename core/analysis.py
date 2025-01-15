@@ -68,10 +68,22 @@ class Analysis:
             data["filed_height"] = data["index_6"] - data["index_4"]
             data["filed_length"] = data["index_3"] - data["index_7"]
 
-            data["y_offset_up"] = data["index_6"] + data["filed_height"] * 0.5
-            data["y_offset_low"] = data["index_2"] - data["filed_height"] * 0.5
-            data["x_offset_up"] = data["index_3"] + data["filed_height"] * 0.5
-            data["x_offset_low"] = data["index_7"] - data["filed_height"] * 0.5
+            data["y_offset_up"] = data["index_6"] + data["filed_height"] * -0.5
+            data["y_offset_low"] = data["index_2"] - data["filed_height"] * -0.5
+            data["x_offset_up"] = data["index_3"] + data["filed_height"] * 1
+            data["x_offset_low"] = data["index_7"] - data["filed_height"] * 1
+            self.middle_y = (max(data["index_2"]) - min(data["index_2"])) / 2
+            self.middle_x = (max(data["index_3"]) - min(data["index_3"])) / 2
+        elif ocr_type == 'smart_vat_invoice':
+            # 行高容错设置
+            data["row_height"] = abs(data["index_4"] - data["index_6"]) / 2.5
+            data["filed_height"] = data["index_6"] - data["index_4"]
+            data["filed_length"] = data["index_3"] - data["index_7"]
+
+            data["y_offset_up"] = data["index_6"] + data["filed_height"] * -1.5
+            data["y_offset_low"] = data["index_2"] - data["filed_height"] * -1.5
+            data["x_offset_up"] = data["index_3"] + data["filed_height"] * 1.2
+            data["x_offset_low"] = data["index_7"] - data["filed_height"] * 1.2
             self.middle_y = (max(data["index_2"]) - min(data["index_2"])) / 2
             self.middle_x = (max(data["index_3"]) - min(data["index_3"])) / 2
         else:
@@ -299,10 +311,39 @@ class Analysis:
         return data
 
     def smart_invoice_analysis(self):
-        时间 = self.analysis_index(key=r'^(2\d{3}-?\d{2}-?\d{2})$', direction="like")
-        发票号码 = self.analysis_index(key='发票号码', direction="like")
+        fileds = {"购买方名称": 3}
+        self.merge_raw_data(fileds)
+        print(self.data)
 
-        data = {"发票号码": 发票号码, "时间": 时间}
+        开票日期 = self.analysis_index(key=r'(2\d{3}-?\d{2}-?\d{2})$', direction="like")
+        发票号码 = self.analysis_index(key='发票号码', direction="like")
+        金额 = self.analysis_index(key="金额", direction="below")
+        项目 = self.analysis_index(key="项目", direction="below")   
+        购买方名称 = self.analysis_index(key=r'购买方名称:?', direction="like")
+        销售方名称 = self.analysis_index(key=r'销售方名称:?', direction="like")
+        if 销售方名称 is None or 销售方名称[0]=="销售方名称":
+            销售方名称 = self.analysis_index(start_key=r'^销售方名称', row_index=1)
+            if "纳税人" in 销售方名称:
+                销售方名称 = self.analysis_index(start_key=r'^销售方名称', row_index=-1)
+        data = {"购买方名称":购买方名称,"销售方名称":销售方名称,"发票号码": 发票号码, "开票日期": 开票日期,"金额":金额,"项目":项目}
+        print(data)
+        return data
+
+    def smart_vat_invoice_analysis(self):
+        fileds = {"购买方名称": 3,"销售方名称": 3}
+        self.merge_raw_data(fileds)
+
+        开票日期 = self.analysis_index(key=r'(2\d{3}-?\d{2}-?\d{2})$', direction="like")
+        发票号码 = self.analysis_index(key='发票代码', direction="like")
+        金额 = self.analysis_index(key="合计金额(小写)", direction="like")
+        项目 = self.analysis_index(key="项目", direction="below")   
+        销售方名称 = self.analysis_index(key=r'销售方名称:?', direction="like")
+
+        购买方名称 = self.analysis_index(key=r'购买方名称:?', direction="like")
+        if 购买方名称 is None or 购买方名称[0]=="购买方名称":
+            购买方名称 = self.analysis_index(start_key=r'^购买方名称', row_index=1)
+
+        data = {"购买方名称":购买方名称,"销售方名称":销售方名称,"发票号码": 发票号码, "开票日期": 开票日期,"金额":金额,"项目":项目}
         print(data)
         return data
 

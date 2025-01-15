@@ -99,6 +99,19 @@ class Analysis:
             data["x_offset_low"] = data["index_7"] - data["filed_height"] * 0
             self.middle_y = (max(data["index_2"]) - min(data["index_2"])) / 2
             self.middle_x = (max(data["index_3"]) - min(data["index_3"])) / 2
+        if ocr_type == 'detail_invoice':
+            # 行高容错设置
+            data["row_height"] = abs(data["index_4"] - data["index_6"]) / 2
+            data["filed_height"] = data["index_6"] - data["index_4"]
+            data["filed_length"] = data["index_3"] - data["index_7"]
+            #横向合并
+            data["y_offset_up"] = data["index_6"] + data["filed_height"] * 0.5
+            data["y_offset_low"] = data["index_2"] - data["filed_height"] * 0.5 
+            #纵向
+            data["x_offset_up"] = data["index_3"] + data["filed_height"] * 2
+            data["x_offset_low"] = data["index_7"] - data["filed_height"] * 2
+            self.middle_y = (max(data["index_2"]) - min(data["index_2"])) / 2
+            self.middle_x = (max(data["index_3"]) - min(data["index_3"])) / 2
         else:
             # 行高容错设置
             data["row_height"] = abs(data["index_4"] - data["index_6"]) / 2.5
@@ -374,9 +387,10 @@ class Analysis:
         return data
 
     def detail_invoice_analysis(self):
+
         时间 = self.analysis_index(key=r'(\d{4}[/\.-]\d{2}[/\.-]\d{2})\s*?(\d{2}:\d{2}:\d{2})', direction="like")
         商品说明 = self.analysis_index(key='商品说明', direction="right")
-        付款方式 = self.analysis_index(key='付款方式', direction="right")
+        付款方式 = self.analysis_index(key=r'付款方式?', direction="right")
         收款方 = self.analysis_index(key='收款方全称', direction="right")
         金额 = self.analysis_index(key=r'^-.*\.', direction="like")
         商户 = self.analysis_index(start_key=r'^-.*\.', row_index=-1)

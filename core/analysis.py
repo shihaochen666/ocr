@@ -86,6 +86,19 @@ class Analysis:
             data["x_offset_low"] = data["index_7"] - data["filed_height"] * 1.2
             self.middle_y = (max(data["index_2"]) - min(data["index_2"])) / 2
             self.middle_x = (max(data["index_3"]) - min(data["index_3"])) / 2
+        if ocr_type == 'plane_invoice':
+            # 行高容错设置
+            data["row_height"] = abs(data["index_4"] - data["index_6"]) / 2
+            data["filed_height"] = data["index_6"] - data["index_4"]
+            data["filed_length"] = data["index_3"] - data["index_7"]
+            #横向合并
+            data["y_offset_up"] = data["index_6"] + data["filed_height"] * 1
+            data["y_offset_low"] = data["index_2"] - data["filed_height"] * 1  
+            #纵向
+            data["x_offset_up"] = data["index_3"] + data["filed_height"] * 0
+            data["x_offset_low"] = data["index_7"] - data["filed_height"] * 0
+            self.middle_y = (max(data["index_2"]) - min(data["index_2"])) / 2
+            self.middle_x = (max(data["index_3"]) - min(data["index_3"])) / 2
         else:
             # 行高容错设置
             data["row_height"] = abs(data["index_4"] - data["index_6"]) / 2.5
@@ -94,8 +107,8 @@ class Analysis:
 
             data["y_offset_up"] = data["index_6"] + data["filed_height"] * 0
             data["y_offset_low"] = data["index_2"] - data["filed_height"] * 0
-            data["x_offset_up"] = data["index_3"] + data["filed_height"] * 1
-            data["x_offset_low"] = data["index_7"] - data["filed_height"] * 1
+            data["x_offset_up"] = data["index_3"] + data["filed_height"] * 2
+            data["x_offset_low"] = data["index_7"] - data["filed_height"] * 2
             self.middle_y = (max(data["index_2"]) - min(data["index_2"])) / 2
             self.middle_x = (max(data["index_3"]) - min(data["index_3"])) / 2
 
@@ -348,8 +361,15 @@ class Analysis:
         return data
 
     def plane_invoice_analysis(self):
+        旅客姓名 = self.analysis_index(key='旅客姓名NAMEOFPASSENGER', direction="below")
+        身份证号码 = self.analysis_index(key='有效身份证件号码ID.NO', direction="below")
+        航班号 = self.analysis_index(key='FLIGHT', direction="below")
+        出发地 = self.analysis_index(key='自FROM', direction="right")
+        到达地 = self.analysis_index(key='至TO', direction="right")
+        时间 = self.analysis_index(key=r'(2\d{3}-?\d{2}-?\d{2})\d{2}:\d{2}$', direction="like")
+        价格 = self.analysis_index(key='合计TOTAL', direction="below")
 
-        data = {}
+        data = {"旅客姓名":旅客姓名,"身份证号码":身份证号码,"航班号":航班号,"出发地":出发地,"到达地":到达地,"时间":时间,"价格":价格}
         print(data)
         return data
 

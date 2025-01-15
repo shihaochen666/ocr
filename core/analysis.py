@@ -269,7 +269,7 @@ class Analysis:
         # 需要合并的字段
         fileds = {"数量": None, "合计": None}
         self.merge_raw_data(fileds)
-        名称 = self.analysis_index(key="名称:", direction="like")
+        名称 = self.analysis_index(key=r"名?称:", direction="like")
         if 名称 and len(名称) > 0:
             购买方名称 = 名称[0].split(":")[1]
         else:

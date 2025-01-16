@@ -374,15 +374,31 @@ class Analysis:
         return data
 
     def plane_invoice_analysis(self):
-        旅客姓名 = self.analysis_index(key='旅客姓名NAMEOFPASSENGER', direction="below")
+        旅客姓名 = self.analysis_index(key=r'旅客姓名NAMEOFPASSENGER', direction="below")
+        if len(旅客姓名)==0:
+            旅客姓名 = self.analysis_index(key='旅客姓名', direction="below")
         身份证号码 = self.analysis_index(key='有效身份证件号码ID.NO', direction="below")
+        if len(身份证号码)==0:
+            身份证号码 = self.analysis_index(key='有效身份证件号码', direction="below")
         航班号 = self.analysis_index(key='FLIGHT', direction="below")
+        if len(航班号)==0:
+            航班号 = self.analysis_index(key='航班号', direction="below")
         出发地 = self.analysis_index(key='自FROM', direction="right")
+        if len(出发地)==0:
+            出发地 = self.analysis_index(key=r'^自:.+', direction="like")
         到达地 = self.analysis_index(key='至TO', direction="right")
-        时间 = self.analysis_index(key=r'(2\d{3}-?\d{2}-?\d{2})\d{2}:\d{2}$', direction="like")
+        if len(到达地)==0:
+            到达地 = self.analysis_index(key=r'^至:.+', direction="like")
+        日期时间 = self.analysis_index(key=r'(2\d{3}-?\d{2}-?\d{2})\d{2}:\d{2}$', direction="like")
+        if len(日期时间)==0:
+            日期 = self.analysis_index(key='日期', direction="below")
+            时间 = self.analysis_index(key='时间', direction="below")
+            日期时间= 日期 + 时间
         价格 = self.analysis_index(key='合计TOTAL', direction="below")
+        if len(价格)==0:
+            价格 = self.analysis_index(key='合计', direction="below")
 
-        data = {"旅客姓名":旅客姓名,"身份证号码":身份证号码,"航班号":航班号,"出发地":出发地,"到达地":到达地,"时间":时间,"价格":价格}
+        data = {"旅客姓名":旅客姓名,"身份证号码":身份证号码,"航班号":航班号,"出发地":出发地,"到达地":到达地,"日期时间":日期时间,"价格":价格}
         print(data)
         return data
 

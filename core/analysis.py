@@ -38,6 +38,7 @@ class Analysis:
                    "accuracy": line[1][1]}
             data.append(row)
         data = pd.DataFrame(data)
+        self.data_old=data
         data = data.sort_values(by=['index_1', 'index_2'], ascending=[True, True])
         if ocr_type == 'vat_invoice':
             # 行高容错设置
@@ -141,7 +142,6 @@ class Analysis:
         print(data)
         self.data = data
         self.data_copy = copy.copy(data)
-        self.result = result
 
     def data_handle(self, ocr_type: str):
         keys = self.data["key"].tolist()
@@ -341,9 +341,10 @@ class Analysis:
 
     def train_invoice_analysis(self):
 
-        姓名 = self.analysis_index(key=r'(\d{10}[\d\*]{8})([^\d]+)', direction="like")  #
+        姓名 = self.analysis_index(key=r'\d{6,10}\*{4,8}[\dXx]+', direction="like")  #
         时间 = self.analysis_index(key=r'\d{4}年\d{2}月\d{2}日\d{2}:\d{2}', direction="like")  #
         stand = self.analysis_index(key='站', direction="like")
+        stand = [item for item in stand if '车站' not in item]
         出发地, 到达地 = [], []
         stand = [item for item in stand if item.endswith('站')]
         if len(stand) == 2:
@@ -417,7 +418,7 @@ class Analysis:
         return data
 
     def smart_invoice_analysis(self):
-        fileds = {"购买方名称": 3}
+        fileds = {"购买方名称": 2}
         self.merge_raw_data(fileds)
         print(self.data)
 
@@ -486,12 +487,23 @@ class Analysis:
 
     def detail_invoice_analysis(self):
 
-        时间 = self.analysis_index(key=r'(\d{4}[/\.-]\d{2}[/\.-]\d{2})\s*?(\d{2}:\d{2}:\d{2})', direction="like")
+        #时间 = self.analysis_index(key=r'\d{4}[/\.-年]\d{1,2}[/\.-月]\d{1,2}日?\s*?(\d{2}:\d{2}:\d{2})', direction="like")
+        时间 = self.analysis_index(key='支付时间', direction="right")
         商品说明 = self.analysis_index(key='商品说明', direction="right")
-        付款方式 = self.analysis_index(key=r'付款方式?', direction="right")
+        付款方式 = self.analysis_index(key='付款方', direction="right")
+        if len(付款方式)==0:
+            付款方式 = self.analysis_index(key='付款方式', direction="right")
+            if len(付款方式)==0:
+                付款方式 = self.analysis_index(key='支付方式', direction="right")
         收款方 = self.analysis_index(key='收款方全称', direction="right")
-        金额 = self.analysis_index(key=r'^-.*\.', direction="like")
-        商户 = self.analysis_index(start_key=r'^-.*\.', row_index=-1)
+        if len(收款方)==0:
+            收款方 = self.analysis_index(key=r'收单机构', direction="right")
+
+        金额 = self.analysis_index(key=r'^-.*\.', direction="likeOld")
+        if 金额:
+            金额=金额[0]
+        #商户 = self.analysis_index(start_key=r'^-.*\.', row_index=-1)
+        商户 = self.analysis_index(start_key=金额, row_index=-1)
 
         data = {"商户": 商户, "金额": 金额, "收款方": 收款方, "付款方式": 付款方式, "时间": 时间, "商品说明": 商品说明}
         print(data)
@@ -602,7 +614,12 @@ class Analysis:
                 curr_loc = filter_values_words_value.index.get_loc(curr_index)
                 next_row = filter_values_words_value.iloc[curr_loc + row_index]
                 return next_row["key"] if next_row is not None else None
-
+        if direction == "likeOld":
+            expr = 'key.str.contains(@key, case=False, na=False)'
+            expr += append_block_filter
+            curr_key = self.data_old.query(expr, engine='python')
+            if not curr_key.empty:
+                return curr_key["key"].tolist()
         if direction == "like":
             expr = 'key.str.contains(@key, case=False, na=False)'
             expr += append_block_filter

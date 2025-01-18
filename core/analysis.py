@@ -557,7 +557,7 @@ class Analysis:
                 # 左对齐 或右对齐
                 filed_height = first_row["filed_height"] * below_height
                 # query_str = f' x_offset_low <= {first_row["index_3"]} and x_offset_up >= {first_row["index_7"]} and  {first_row["index_2"]}+{filed_height} >= index_2  and {first_row["index_2"]}<= index_2'
-                 query_str = f' {first_row["x_offset_low"]} <= index_3 and {first_row["x_offset_up"]} >= index_7 and  {first_row["index_2"]}+{filed_height} >= index_2  and {first_row["index_2"]}<= index_6'
+                query_str = f' {first_row["x_offset_low"]} <= index_3 and {first_row["x_offset_up"]} >= index_7 and  {first_row["index_2"]}+{filed_height} >= index_2  and {first_row["index_2"]}<= index_6'
                 # query_str = f' ({first_row["x_offset_low"]} < index_3 < {first_row["x_offset_up"]} and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height * 2} and index_2 != {first_row["index_2"]}) or ({first_row["x_offset_low"]} < index_7 < {first_row["x_offset_up"]} and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height * 2} and index_2 != {first_row["index_2"]})'
                 query_str += append_block_filter
                 filter_values_words_value = self.data.query(query_str)

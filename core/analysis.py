@@ -82,10 +82,10 @@ class Analysis:
             data["filed_height"] = data["index_6"] - data["index_4"]
             data["filed_length"] = data["index_3"] - data["index_7"]
 
-            data["y_offset_up"] = data["index_6"] + data["filed_height"] * -0.5
-            data["y_offset_low"] = data["index_2"] - data["filed_height"] * -0.5
-            data["x_offset_up"] = data["index_3"] + data["filed_height"] * 1
-            data["x_offset_low"] = data["index_7"] - data["filed_height"] * 1
+            data["y_offset_up"] = data["index_6"] + data["filed_height"] * 0
+            data["y_offset_low"] = data["index_2"] - data["filed_height"] * 0
+            data["x_offset_up"] = data["index_3"] + data["filed_height"] * 0
+            data["x_offset_low"] = data["index_7"] - data["filed_height"] * 0
             self.middle_y = (max(data["index_2"]) - min(data["index_2"])) / 2
             self.middle_x = (max(data["index_3"]) - min(data["index_3"])) / 2
         elif ocr_type == 'smart_vat_invoice':
@@ -418,7 +418,7 @@ class Analysis:
         return data
 
     def smart_invoice_analysis(self):
-        fileds = {"购买方名称": 2}
+        fileds = {"开票日期": 3,"购买方名称": 3}
         self.merge_raw_data(fileds)
         print(self.data)
 

@@ -3,7 +3,8 @@ import time
 import re
 import pandas as pd
 from paddleocr import PaddleOCR
-
+import cv2
+import numpy as np
 
 class Analysis:
 
@@ -226,16 +227,24 @@ class Analysis:
                 # 价税合计小写.append(价税合计小写[0])
                 价税合计大写.append(价税合计.replace(价税合计小写[0], ""))
                 # # 取不到再取一次
-                # else:
-                #     key = r'([壹贰叁肆伍陆柒捌玖拾佰仟万亿零]+(?:零)?)*[圆园元](?:[零壹贰叁肆伍陆柒捌玖拾]+角)?(?:[零壹贰叁肆伍陆捌玖拾]+分)?(?:整)?'
-                #     expr = f'key.str.contains(@key, case=False, na=False)'
-                #     curr_key = self.data_copy.query(expr, engine='python')
-                #     if not curr_key.empty:
-                #         价税合计大写 = curr_key["key"].tolist()
-                #         # TODO 大写转小写
-                #         # 价税合计小写
-        # if  len(价税合计小写)==0:
-        #     价税合计小写=self.analysis_index(key=r"[￥¥]([0-9,]+(\.\d{1,2})?)", direction="like")
+            else:
+                key = r'([壹贰叁肆伍陆柒捌玖拾佰仟万亿零]+(?:零)?)*[圆园元](?:[零壹贰叁肆伍陆柒捌玖拾]+角)?(?:[零壹贰叁肆伍陆捌玖拾]+分)?(?:整)?'
+                expr = f'key.str.contains(@key, case=False, na=False)'
+                curr_key = self.data_copy.query(expr, engine='python')
+                if not curr_key.empty:
+                    价税合计大写 = curr_key["key"].tolist()
+                    # TODO 大写转小写
+                    # 价税合计小写
+                if len(价税合计小写) == 0:
+                    价税合计小写 = self.analysis_index(key=r"[￥¥]([0-9,]+(\.\d{1,2})?)", direction="like")
+                    if len(价税合计小写) > 0:
+                        价税合计小写 = 价税合计小写[-1:]
+        if  len(价税合计大写)==0:
+            价税合计大写=self.analysis_index(
+            key=r'([壹贰叁肆伍陆柒捌玖拾佰仟零]+(?:零)?)*[圆园元](?:[零壹贰叁肆伍陆柒捌玖拾]+角)?(?:[零壹贰叁肆伍陆捌玖拾]+分)?(?:整)?',
+            direction="like")
+        if  len(价税合计小写)==0:
+            价税合计小写=self.analysis_index(key=r"\(小写\)[￥¥]?([0-9,]+(\.\d{1,2})?)", direction="like")
 
         开票日期 = self.analysis_index(key=r'(\d{4}[年]\d{2}[月]\d{2})', direction="like")
 
@@ -548,14 +557,14 @@ class Analysis:
                 # 左对齐 或右对齐
                 filed_height = first_row["filed_height"] * below_height
                 # query_str = f' x_offset_low <= {first_row["index_3"]} and x_offset_up >= {first_row["index_7"]} and  {first_row["index_2"]}+{filed_height} >= index_2  and {first_row["index_2"]}<= index_2'
-                query_str = f' {first_row["x_offset_low"]} <= index_7 and {first_row["x_offset_up"]} >= index_3 and  {first_row["index_2"]}+{filed_height} >= index_2  and {first_row["index_2"]}<= index_2'
+                 query_str = f' {first_row["x_offset_low"]} <= index_3 and {first_row["x_offset_up"]} >= index_7 and  {first_row["index_2"]}+{filed_height} >= index_2  and {first_row["index_2"]}<= index_6'
                 # query_str = f' ({first_row["x_offset_low"]} < index_3 < {first_row["x_offset_up"]} and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height * 2} and index_2 != {first_row["index_2"]}) or ({first_row["x_offset_low"]} < index_7 < {first_row["x_offset_up"]} and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height * 2} and index_2 != {first_row["index_2"]})'
                 query_str += append_block_filter
                 filter_values_words_value = self.data.query(query_str)
 
             elif end_key is not None and direction == "below":
                 # 左对齐 或右对齐
-                query_str = f' {first_row["x_offset_low"]} <= index_7 and {first_row["x_offset_up"]} >= index_3 and  {end_row["y_offset_up"]} >= index_2  and {end_row["y_offset_low"]} <= index_6'
+                query_str = f' {first_row["x_offset_low"]} <= index_3 and {first_row["x_offset_up"]} >= index_7 and  {end_row["y_offset_up"]} >= index_2  and {end_row["y_offset_low"]} <= index_6'
                 query_str += append_block_filter
                 filter_values_words_value = self.data.query(query_str)
             if filter_values_words_value is None:

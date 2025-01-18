@@ -40,6 +40,19 @@ class Analysis:
         data = pd.DataFrame(data)
         self.data_old=data
         data = data.sort_values(by=['index_1', 'index_2'], ascending=[True, True])
+        # 如果最大行高 > 最大 列高，需反转
+        data["pre_filed_height"] = data["index_6"] - data["index_4"]
+        max_pre_filed_height = data['pre_filed_height'].max()
+
+        data["pre_filed_length"] = data["index_3"] - data["index_7"]
+        max_pre_filed_length = data['pre_filed_length'].max()
+
+        if max_pre_filed_height > max_pre_filed_length:
+            data["index_1"], data["index_2"], data["index_7"], data["index_8"], data["index_5"], data["index_6"], data[
+                "index_3"], data["index_4"] = data["index_2"], data["index_1"], data["index_4"], data["index_3"], data[
+                "index_6"], data["index_5"], data["index_8"], data["index_7"]
+
+        data = data.sort_values(by=['index_1', 'index_2'], ascending=[True, True])
         if ocr_type == 'vat_invoice':
             # 行高容错设置
             data["row_height"] = abs(data["index_4"] - data["index_6"]) / 2
@@ -274,11 +287,11 @@ class Analysis:
     
     def vat_invoice_analysis(self):
         # 需要合并的字段
-        fileds = {"价税合计(大写)": 5, "收款人:": 0.3, "开票人:": 0.5, "称:": 10}
+        fileds = {"价税合计(大写)": 6, "开票人:": 4, "称:": 3,"金":4}
         self.merge_raw_data(fileds)
         print(self.data)
 
-        名称 = self.analysis_index(key="称:", direction="like")
+        名称 = self.analysis_index(key=r"称:", direction="like")
         if len(名称) == 2:
             购买方名称 = 名称[0].split(":")[1]
             销售方名称 = 名称[1].split(":")[1]
@@ -317,7 +330,8 @@ class Analysis:
             价税合计大写=self.analysis_index(
             key=r'([壹贰叁肆伍陆柒捌玖拾佰仟零]+(?:零)?)*[圆园元](?:[零壹贰叁肆伍陆柒捌玖拾]+角)?(?:[零壹贰叁肆伍陆捌玖拾]+分)?(?:整)?',
             direction="like")
-            
+        else:
+            价税合计大写 = re.sub(r'(整|分).*', r'\1', 价税合计大写[0])
 
         开票日期 = self.analysis_index(key=r'(\d{4}[年]\d{2}[月]\d{2})', direction="like")
 
@@ -328,8 +342,12 @@ class Analysis:
         税率 = self.analysis_index(key="税率", direction="below")
         收款人 = self.analysis_index(key="收款人:", direction="like", block=1)
         金额 = self.analysis_index(key="金额", end_key="￥",direction="below")
+        if len(金额)==0:
+            金额 = self.analysis_index(key="金:额", end_key="￥",direction="below")
         税额 = self.analysis_index(key="税额", end_key="￥",direction="below")
-        项目名称 = self.analysis_index(key=r"[货物或应税劳务、]*?服务名称", direction="below")
+        if len(税额)==0:
+            税额 = self.analysis_index(key="税率:税额", end_key="￥",direction="below")
+        项目名称 = self.analysis_index(key="货物或应税劳务、服务名称", direction="below")
         if 项目名称:
             项目名称 = 项目名称[0]
 

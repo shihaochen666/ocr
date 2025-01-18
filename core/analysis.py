@@ -44,8 +44,8 @@ class Analysis:
             data["filed_height"] = data["index_6"] - data["index_4"]
             data["filed_length"] = data["index_3"] - data["index_7"]
 
-            data["y_offset_up"] = data["index_6"] + data["filed_height"] * -2
-            data["y_offset_low"] = data["index_2"] - data["filed_height"] * -2
+            data["y_offset_up"] = data["index_6"] + data["filed_height"] * 0.2
+            data["y_offset_low"] = data["index_2"] - data["filed_height"] * -0.2
             data["x_offset_up"] = data["index_3"] + data["filed_height"] * 2
             data["x_offset_low"] = data["index_7"] - data["filed_height"] * 2
             self.middle_y = (max(data["index_2"]) - min(data["index_2"])) / 2
@@ -199,7 +199,7 @@ class Analysis:
 
     def vat_invoice_analysis(self):
         # 需要合并的字段
-        fileds = {"价税合计(大写)": 5, "收款人:": 0.3, "开票人:": 0.5}
+        fileds = {"价税合计(大写)": 5, "收款人:": 0.3, "开票人:": 0.5, "称:": 2}
         self.merge_raw_data(fileds)
         print(self.data)
 
@@ -215,21 +215,16 @@ class Analysis:
             if len(购买方名称) == 1:
                 购买方名称 = [购买方名称[0].split(":")[1]]
 
-        大写 = self.analysis_index(
-            key=r'^([壹贰叁肆伍陆柒捌玖拾佰仟万亿零]+(?:零)?)*[圆园元](?:[零壹贰叁肆伍陆柒捌玖拾]+角)?(?:[零壹贰叁肆伍陆捌玖拾]+分)?(?:整)?',
-            direction="like")
-        小写 = self.analysis_index(key=r"\(小写\)[￥¥]\s*([0-9]+(?:[,0-9]*)*(?:\.\d{1,2})?)", direction="like")
-        价税合计大写, 价税合计小写 = 大写, 小写
-        if len(小写) == 0:
-            价税合计 = self.analysis_index(key="价税合计", direction="like")
-            if len(价税合计) != 0 and ":" in 价税合计[0] and not 价税合计[0].endswith(":"):
-                价税合计 = 价税合计[0].split(":")[1].replace("小写", "").replace("(", "").replace(")", "")
-                pattern = r'[1234567890¥.]*'
-                matches = re.findall(pattern, 价税合计)
-                价税合计小写 = [match for match in matches if match]
-                if len(价税合计小写) > 1:
-                    价税合计小写 = 价税合计小写[0]
-                #     价税合计大写 = 价税合计.replace(价税合计小写, "")
+        价税合计 = self.analysis_index(key="价税合计", direction="like")
+        价税合计小写, 价税合计大写 = [], []
+        if len(价税合计) != 0 and ":" in 价税合计[0] and not 价税合计[0].endswith(":"):
+            价税合计 = 价税合计[0].split(":")[1].replace("小写", "").replace("(", "").replace(")", "")
+            pattern = r'[1234567890¥.]*'
+            matches = re.findall(pattern, 价税合计)
+            价税合计小写 = [match for match in matches if match]
+            if len(价税合计小写) > 0:
+                # 价税合计小写.append(价税合计小写[0])
+                价税合计大写.append(价税合计.replace(价税合计小写[0], ""))
                 # # 取不到再取一次
                 # else:
                 #     key = r'([壹贰叁肆伍陆柒捌玖拾佰仟万亿零]+(?:零)?)*[圆园元](?:[零壹贰叁肆伍陆柒捌玖拾]+角)?(?:[零壹贰叁肆伍陆捌玖拾]+分)?(?:整)?'
@@ -313,9 +308,10 @@ class Analysis:
         if 金额合计:
             金额合计 = 金额合计[0]
 
+        # "规格型号": 规格型号, "单位": 单位, "数量": 数量, "金额": 金额, "税额": 税额,
         data = {"开票日期": 开票日期, "发票号码": 发票号码, "购买方名称": 购买方名称, "销售方名称": 销售方名称,
                 "价税合计大写": 价税合计大写, "价税合计小写": 价税合计小写, "项目名称": 项目名称,
-                "规格型号": 规格型号, "单位": 单位, "数量": 数量, "金额": 金额, "税额": 税额, "金额合计": 金额合计,
+                "金额合计": 金额合计,
                 "税额合计": 税额合计, "开票人": 开票人}
         print(data)
         return data
@@ -536,14 +532,15 @@ class Analysis:
             elif end_key is None and direction == "below":
                 # 左对齐 或右对齐
                 filed_height = first_row["filed_height"] * below_height
-                query_str = f' {first_row["x_offset_low"]} <= index_3 and {first_row["x_offset_up"]} >= index_7 and  {first_row["index_2"]}+{filed_height} >= index_2  and {first_row["index_2"]}<= index_2'
+                # query_str = f' x_offset_low <= {first_row["index_3"]} and x_offset_up >= {first_row["index_7"]} and  {first_row["index_2"]}+{filed_height} >= index_2  and {first_row["index_2"]}<= index_2'
+                query_str = f' {first_row["x_offset_low"]} <= index_7 and {first_row["x_offset_up"]} >= index_3 and  {first_row["index_2"]}+{filed_height} >= index_2  and {first_row["index_2"]}<= index_2'
                 # query_str = f' ({first_row["x_offset_low"]} < index_3 < {first_row["x_offset_up"]} and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height * 2} and index_2 != {first_row["index_2"]}) or ({first_row["x_offset_low"]} < index_7 < {first_row["x_offset_up"]} and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height * 2} and index_2 != {first_row["index_2"]})'
                 query_str += append_block_filter
                 filter_values_words_value = self.data.query(query_str)
 
             elif end_key is not None and direction == "below":
                 # 左对齐 或右对齐
-                query_str = f' {first_row["x_offset_low"]} < index_3 and {first_row["x_offset_up"]} > index_7 and  {end_row["y_offset_up"]} >= index_2  and {end_row["y_offset_low"]} <= index_6'
+                query_str = f' {first_row["x_offset_low"]} <= index_7 and {first_row["x_offset_up"]} >= index_3 and  {end_row["y_offset_up"]} >= index_2  and {end_row["y_offset_low"]} <= index_6'
                 query_str += append_block_filter
                 filter_values_words_value = self.data.query(query_str)
             if filter_values_words_value is None:
@@ -578,11 +575,8 @@ if __name__ == '__main__':
 # and {first_row["index_2"]} <= index_2 <= {first_row["index_2"]}+ {filed_height}
 # and index_2 != {first_row["index_2"]})'
 
-# index_1  index_2  index_3  index_4  index_5  index_6  index_7  index_8  filed_length  y_offset_up  y_offset_low  x_offset_up  x_offset_low
-# 48    307.0   2068.0    858.0   2068.0    858.0   2143.0    307.0   2143.0   551.0       2075.5        2060.5       1008.0         157.0          价税合计(大写)
-# 49   1203.0   2068.0   1754.0   2068.0   1754.0   2156.0   1203.0   2156.0   551.0       2076.8        2059.2       1930.0        1027.0          肆佰伍拾圆整
-# 51   3174.0   2090.0   3524.0   2090.0   3524.0   2164.0   3174.0   2164.0   350.0
-# 2090.0        2090.0       3672.0        3026.0  $450
-
-# 69   2619.0   1576.0   2891.0   1567.0   2893.0   1628.0   2621.0   1637.0
-# 80    931.0   1811.0   1479.0   1798.0   1481.0   1867.0    933.0   1880.0
+#      index_1  index_2  index_3  index_4  index_5  index_6  index_7  index_8     filed_length  y_offset_up  y_offset_low  x_offset_up  x_offset_low
+# 12   2637.0    964.0   2854.0    964.0   2854.0   1043.0   2637.0   1043.0        217.0       1043.0         964.0       3012.0        2479.0
+# 13   2923.0    964.0   3277.0    964.0   3277.0   1039.0   2923.0   1039.0        354.0       1039.0         964.0       3427.0        2773.0  税率/征收率
+# 19   2607.0   1039.0   2850.0   1039.0   2850.0   1113.0   2607.0   1113.0        243.0       1113.0        1039.0       2998.0        2459.0
+#  {first_row["x_offset_low"]} <= index_3 and {first_row["x_offset_up"]} >= index_7 and  {first_row["index_2"]}+{filed_height} >= index_2  and {first_row["index_2"]}<= index_2'

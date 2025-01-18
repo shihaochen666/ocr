@@ -45,7 +45,7 @@ class Analysis:
             data["filed_height"] = data["index_6"] - data["index_4"]
             data["filed_length"] = data["index_3"] - data["index_7"]
 
-            data["y_offset_up"] = data["index_6"] + data["filed_height"] * 0.2
+            data["y_offset_up"] = data["index_6"] + data["filed_height"] * -0.2
             data["y_offset_low"] = data["index_2"] - data["filed_height"] * -0.2
             data["x_offset_up"] = data["index_3"] + data["filed_height"] * 2
             data["x_offset_low"] = data["index_7"] - data["filed_height"] * 2
@@ -200,7 +200,7 @@ class Analysis:
 
     def vat_invoice_analysis(self):
         # 需要合并的字段
-        fileds = {"价税合计(大写)": 5, "收款人:": 0.3, "开票人:": 0.5, "称:": 2}
+        fileds = {"价税合计(大写)": 5, "收款人:": 0.3, "开票人:": 0.5, "称:": 10}
         self.merge_raw_data(fileds)
         print(self.data)
 
@@ -236,31 +236,31 @@ class Analysis:
                     # TODO 大写转小写
                     # 价税合计小写
                 if len(价税合计小写) == 0:
-                    价税合计小写 = self.analysis_index(key=r"[￥¥]([0-9,]+(\.\d{1,2})?)", direction="like")
+                    价税合计小写=self.analysis_index(key=r"^\(小写\)[￥¥]?([0-9,]+(\.\d{1,2})?)", direction="like")
                     if len(价税合计小写) > 0:
                         价税合计小写 = 价税合计小写[-1:]
         if  len(价税合计大写)==0:
             价税合计大写=self.analysis_index(
             key=r'([壹贰叁肆伍陆柒捌玖拾佰仟零]+(?:零)?)*[圆园元](?:[零壹贰叁肆伍陆柒捌玖拾]+角)?(?:[零壹贰叁肆伍陆捌玖拾]+分)?(?:整)?',
             direction="like")
-        if  len(价税合计小写)==0:
-            价税合计小写=self.analysis_index(key=r"\(小写\)[￥¥]?([0-9,]+(\.\d{1,2})?)", direction="like")
+            
 
         开票日期 = self.analysis_index(key=r'(\d{4}[年]\d{2}[月]\d{2})', direction="like")
 
-        发票号码 = self.analysis_index(key=r"^No?\d+", direction="like")
+        发票号码 = self.analysis_index(key="发票号码", direction="like")
+        if len(发票号码)==0:
+            发票号码 = self.analysis_index(key=r"^No?\d+", direction="like")
         开票人 = self.analysis_index(key="开票人:", direction="like")
-
-        购买方纳税人识别号 = ""  # self.analysis_index(key="纳税人识别号:", direction="like", block=1)[0].split(":")[1]
-        销售方方纳税人识别号 = ""  # self.analysis_index(key="纳税人识别号:", direction="like", block=3)[0].split(":")[1]
         税率 = self.analysis_index(key="税率", direction="below")
-        购买方开户行及账号 = ""  # self.analysis_index(key="开户行及账号", direction="like", block=3)
-        销售方方开户行及账号 = ""  # self.analysis_index(key="开户行及账号", direction="like", block=1)
-
         收款人 = self.analysis_index(key="收款人:", direction="like", block=1)
+        金额 = self.analysis_index(key="金额", end_key="￥",direction="below")
+        税额 = self.analysis_index(key="税额", end_key="￥",direction="below")
+        项目名称 = self.analysis_index(key=r"[货物或应税劳务、]*?服务名称", direction="below")
+        if 项目名称:
+            项目名称 = 项目名称[0]
 
         print(self.data)
-        data = {"开票日期": 开票日期, "发票号码": 发票号码, "购买方名称": 购买方名称, "销售方名称": 销售方名称,
+        data = {"开票日期": 开票日期, "发票号码": 发票号码, "购买方名称": 购买方名称, "销售方名称": 销售方名称,"项目名称":项目名称,"金额":金额,"税额":税额,
                 "价税合计大写": 价税合计大写, "价税合计小写": 价税合计小写, "开票人": 开票人}
         print(data)
         return data
@@ -306,7 +306,9 @@ class Analysis:
         发票号码 = self.analysis_index(key="发票号码:", direction="like")
         开票人 = self.analysis_index(key="开票人:", direction="like")
 
-        项目名称 = self.analysis_index(key="项目名称", direction="below", below_height=8)
+        项目名称 = self.analysis_index(key="项目名称", direction="below")
+        if 项目名称:
+            项目名称 = 项目名称[0]
         规格型号 = self.analysis_index(key="规格型号", direction="below")
         单位 = self.analysis_index(key="单位", direction="below")
         数量 = self.analysis_index(key="数量", direction="below")
